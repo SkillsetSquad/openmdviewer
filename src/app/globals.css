@@ -2864,6 +2864,9 @@ kbd {
   font-size: 10px;
   margin-top: 3px;
 }
+.workspace-graph-list button.selected small {
+  color: var(--foreground);
+}
 .workspace-graph-list i,
 .workspace-graph-tags i {
   width: 7px;

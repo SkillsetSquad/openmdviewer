@@ -206,8 +206,8 @@ export default function Workspace() {
   }, [preferences, activeId, workspaceId, loaded, switching]);
   useEffect(() => {
     if (!loaded) return;
-    const narrow = window.matchMedia("(max-width: 999px)");
-    const mobile = window.matchMedia("(max-width: 749px)");
+    const narrow = window.matchMedia("(max-width: 1000px)");
+    const mobile = window.matchMedia("(max-width: 750px)");
     const closeDetails = () => {
       if (narrow.matches) setRightOpen(false);
     };

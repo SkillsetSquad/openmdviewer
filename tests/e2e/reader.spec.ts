@@ -1027,6 +1027,7 @@ test("retains multiple queued conflicts until both documents have been recovered
 test("explores the whole workspace graph with filters, directed links, canvas controls, and keyboard navigation", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("./");
@@ -1200,7 +1201,16 @@ test("keeps the graph usable on mobile and paginates large document lists", asyn
         buffer: Buffer.from(`# Orbit ${i}`),
       })),
     );
+  await expect(
+    page.getByText(
+      "Imported 60 documents and 0 media files. Kept on this device.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("button", { name: "Close file navigation", exact: true }),
+  ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Open file navigation", exact: true })
     .click();
