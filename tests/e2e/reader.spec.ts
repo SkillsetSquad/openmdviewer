@@ -934,6 +934,7 @@ test("retains multiple queued conflicts until both documents have been recovered
     const marker = window as Window & {
       __saveLock?: boolean;
       __saveLockDone?: boolean;
+      __saveLockRelease?: boolean;
     };
     const request = indexedDB.open("openmdviewer");
     request.onsuccess = () => {
@@ -953,11 +954,11 @@ test("retains multiple queued conflicts until both documents have been recovered
               revision: (doc.revision || 0) + 1,
             });
         }
-        const until = performance.now() + 2500;
+        const until = performance.now() + 10000;
         const hold = () => {
           const pending = store.get("__keep_transaction_active__");
           pending.onsuccess = () => {
-            if (performance.now() < until) hold();
+            if (!marker.__saveLockRelease && performance.now() < until) hold();
           };
         };
         marker.__saveLock = true;
@@ -973,10 +974,20 @@ test("retains multiple queued conflicts until both documents have been recovered
     () => (window as Window & { __saveLock?: boolean }).__saveLock === true,
   );
   await expect(second.locator(".cm-content")).toHaveText("# Original A");
-  await second.locator(".cm-content").fill("# Second A");
+  await second.locator(".cm-content").click();
+  await second.keyboard.press("ControlOrMeta+a");
+  await second.keyboard.insertText("# Second A");
+  await expect(second.locator(".cm-content")).toHaveText("# Second A");
   await second.getByRole("button", { name: "Queue B.md", exact: true }).click();
   await expect(second.locator(".cm-content")).toHaveText("# Original B");
-  await second.locator(".cm-content").fill("# Second B");
+  await second.locator(".cm-content").click();
+  await second.keyboard.press("ControlOrMeta+a");
+  await second.keyboard.insertText("# Second B");
+  await expect(second.locator(".cm-content")).toHaveText("# Second B");
+  await page.evaluate(() => {
+    (window as Window & { __saveLockRelease?: boolean }).__saveLockRelease =
+      true;
+  });
   await page.waitForFunction(
     () =>
       (window as Window & { __saveLockDone?: boolean }).__saveLockDone === true,
