@@ -55,7 +55,7 @@ docker build --build-arg NEXT_PUBLIC_BASE_PATH=/reader -t openmdviewer .
 docker run --rm -p 8080:80 openmdviewer
 ```
 
-Open http://localhost:8080/reader/. A reverse proxy must forward the prefix unchanged. Browser storage is scoped to origin, so two instances on one origin currently share the IndexedDB database; use separate origins for isolated workspaces.
+Open http://localhost:8080/reader/. A reverse proxy must forward the prefix unchanged. Browser storage is scoped to origin, so two deployments on one origin share the IndexedDB database. Use the workspace selector to separate projects within the app, or separate origins for completely independent installations. IndexedDB upgrades preserve the original default workspace and imported media.
 
 ## Offline operation and updates
 

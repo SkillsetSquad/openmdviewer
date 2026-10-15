@@ -1,3 +1,7 @@
+import {
+  workspaceMetadataPath,
+  applyWorkspaceMetadata,
+} from "./workspace-archive";
 import { newDocument, safePath, supportedFile } from "./documents";
 import type { ReaderAsset, ReaderDocument } from "./types";
 const mediaTypes: Record<string, string> = {
@@ -62,7 +66,11 @@ export async function readLocalFiles(files: File[]) {
       let expanded = 0;
       const content = unzipSync(new Uint8Array(await file.arrayBuffer()), {
         filter: (entry) => {
-          if (!supportedFile(entry.name) && !mediaType(entry.name))
+          if (
+            !supportedFile(entry.name) &&
+            !mediaType(entry.name) &&
+            entry.name !== workspaceMetadataPath
+          )
             return false;
           expanded += entry.originalSize;
           if (
@@ -73,7 +81,13 @@ export async function readLocalFiles(files: File[]) {
           return true;
         },
       });
+      const first = documents.length;
       for (const [path, bytes] of Object.entries(content)) add(path, bytes);
+      if (content[workspaceMetadataPath])
+        applyWorkspaceMetadata(
+          documents.slice(first),
+          new TextDecoder().decode(content[workspaceMetadataPath]),
+        );
     } else if (supportedFile(file.name) || mediaType(file.name))
       add(
         file.webkitRelativePath || `Imported/${file.name}`,

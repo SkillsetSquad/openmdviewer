@@ -295,3 +295,248 @@ test("uses a compiled worker for fuzzy search instead of silently falling back",
     page.getByRole("button", { name: /Configuration Guide Docs/ }),
   ).toBeVisible();
 });
+
+test("creates independent workspaces and remembers the selected project", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Manage workspaces", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "New workspace", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Workspace name", exact: true })
+    .fill("Private project");
+  await page
+    .getByRole("textbox", { name: "Description", exact: true })
+    .fill("A separate collection");
+  await page
+    .getByRole("button", { name: "Create workspace", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "A little space for your words." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Current workspace" }),
+  ).toContainText("Private project");
+  await page
+    .getByRole("button", { name: "Create document", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "File path", exact: true })
+    .fill("Project.md");
+  await page
+    .getByRole("button", { name: "Create document", exact: true })
+    .last()
+    .click();
+  await expect(page.locator(".cm-content")).toBeVisible();
+  await page
+    .locator(".cm-content")
+    .fill("# Private project note\n\nOnly in this workspace.");
+  await expect(
+    page.locator(".bottom-status").getByText("Saved in this browser"),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Current workspace" })
+    .selectOption("default");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Project.md", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("combobox", { name: "Current workspace" })
+    .selectOption({ label: "📁 Private project" });
+  await expect(
+    page.getByRole("heading", { name: "Private project note", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Private project note", exact: true }),
+  ).toBeVisible();
+});
+
+test("restores a revision and recovers deleted documents from trash", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Recovery.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Original revision\n\nKeep me safe."),
+    });
+  await page.getByRole("button", { name: "Split view", exact: true }).click();
+  await page
+    .locator(".cm-content")
+    .fill("# New revision\n\nAn edited version.");
+  await expect(
+    page.getByRole("heading", { name: "New revision", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".bottom-status").getByText("Saved in this browser"),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Version history", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Previous revision" })
+    .selectOption({ index: 1 });
+  await expect(page.getByLabel("Revision comparison")).toContainText(
+    "Original revision",
+  );
+  await page
+    .getByRole("button", { name: "Restore this revision", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Original revision", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Move to trash", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Original revision", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Workspace trash", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Workspace trash" })
+      .getByText("No deleted documents."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await page.getByRole("button", { name: "Recovery.md", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Original revision", exact: true }),
+  ).toBeVisible();
+});
+
+test("detects edits from another tab and preserves both versions on request", async ({
+  page,
+  context,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Conflict.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Shared original"),
+    });
+  await expect(
+    page.getByRole("heading", { name: "Shared original" }),
+  ).toBeVisible();
+  const second = await context.newPage();
+  await second.goto("./");
+  await expect(
+    second.getByRole("heading", { name: "Shared original" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Split view", exact: true }).click();
+  await page.locator(".cm-content").fill("# First tab version");
+  await expect(
+    page.locator(".bottom-status").getByText("Saved in this browser"),
+  ).toBeVisible();
+  await second.getByRole("button", { name: "Split view", exact: true }).click();
+  await second.locator(".cm-content").fill("# Second tab version");
+  await expect(
+    second.getByRole("dialog", {
+      name: "This document changed in another tab",
+    }),
+  ).toBeVisible();
+  await second
+    .getByRole("button", { name: "Keep both versions", exact: true })
+    .click();
+  await expect(
+    second.getByRole("dialog", {
+      name: "This document changed in another tab",
+    }),
+  ).toHaveCount(0);
+  await expect(
+    second.getByRole("heading", { name: "Second tab version", exact: true }),
+  ).toBeVisible();
+  await second
+    .getByRole("button", { name: "Conflict.md", exact: true })
+    .click();
+  await expect(
+    second.getByRole("heading", { name: "First tab version", exact: true }),
+  ).toBeVisible();
+  await second.close();
+});
+
+test("migrates an existing browser database and preserves local media", async ({
+  page,
+}) => {
+  await page.goto("icon.svg");
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open("openmdviewer", 20);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        const docs = db.createObjectStore("documents", { keyPath: "id" });
+        for (const index of ["path", "updatedAt", "favorite"])
+          docs.createIndex(index, index);
+        db.createObjectStore("assets", { keyPath: "path" });
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction(["documents", "assets"], "readwrite");
+        tx.objectStore("documents").put({
+          id: "legacy",
+          path: "Docs/Legacy.md",
+          content: "# Legacy document\n\n![Legacy image](photo.png)",
+          tags: ["legacy"],
+          favorite: true,
+          scroll: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        });
+        const bytes = Uint8Array.from(
+          atob(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
+          ),
+          (c) => c.charCodeAt(0),
+        );
+        tx.objectStore("assets").put({
+          path: "Docs/photo.png",
+          blob: new Blob([bytes], { type: "image/png" }),
+          type: "image/png",
+        });
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+    });
+  });
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Legacy document" }),
+  ).toBeVisible();
+  await expect(page.getByText("1 documents, all local")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Enlarge image: Legacy image" }),
+  ).toHaveAttribute("src", /^blob:/);
+  await page.getByRole("button", { name: "Favorites", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Legacy.md", exact: true }),
+  ).toBeVisible();
+});

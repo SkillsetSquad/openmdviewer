@@ -2253,3 +2253,146 @@ kbd {
     display: inline-flex;
   }
 }
+.workspace-switcher {
+  display: flex;
+  margin: 0 13px 14px;
+  gap: 6px;
+  align-items: center;
+}
+.workspace-switcher select {
+  flex: 1;
+  min-width: 0;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--foreground);
+  padding: 7px 8px;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+.workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 20px 0;
+}
+.workspace-list > div {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  align-items: center;
+}
+.workspace-list > div > button:first-child {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  text-align: left;
+  min-width: 0;
+}
+.workspace-list > div > button:first-child > span:first-child {
+  font-size: 22px;
+}
+.workspace-list strong,
+.trash-list strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+}
+.workspace-list small,
+.trash-list small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  margin-top: 4px;
+}
+.workspace-list > div > button:last-child {
+  padding: 12px;
+  color: var(--muted-foreground);
+}
+.workspace-list > div > button > small {
+  margin-left: auto;
+}
+.create-workspace {
+  width: 100%;
+}
+.recovery-content {
+  padding: 0 24px 24px;
+}
+.form-label select {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 9px;
+}
+.diff-label {
+  display: flex;
+  gap: 20px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  margin: 18px 0 7px;
+}
+.diff-label i {
+  display: inline-block;
+  height: 8px;
+  width: 8px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+.document-diff {
+  max-height: 40vh;
+  overflow: auto;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  white-space: pre-wrap;
+  font: 11px/1.8 var(--font-geist-mono);
+}
+.document-diff > span {
+  display: block;
+}
+.diff-added {
+  background: #238c5740;
+  color: #87e5b1;
+}
+.diff-removed {
+  background: #bb364440;
+  color: #ffb0b9;
+}
+.theme-light .diff-added,
+.theme-sepia .diff-added {
+  color: #0e6238;
+}
+.theme-light .diff-removed,
+.theme-sepia .diff-removed {
+  color: #a71830;
+}
+.trash-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.trash-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+.workspace-loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 150;
+  background: #101419bb;
+  backdrop-filter: blur(3px);
+  color: white;
+}

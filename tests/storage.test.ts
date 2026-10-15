@@ -22,13 +22,11 @@ describe("durable workspace storage", () => {
       .stores({ documents: "id, path, updatedAt, favorite", assets: "path" });
     const doc = newDocument("Notes/A.md", "# Preserve me");
     await legacy.table("documents").put(doc);
-    await legacy
-      .table("assets")
-      .put({
-        path: "Notes/a.png",
-        blob: new Blob(["original"]),
-        type: "image/png",
-      });
+    await legacy.table("assets").put({
+      path: "Notes/a.png",
+      blob: new Blob(["original"]),
+      type: "image/png",
+    });
     legacy.close();
     const storage = createStorage(name);
     const result = await storage.initialize([]);

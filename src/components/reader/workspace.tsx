@@ -52,10 +52,16 @@ import { FileTree } from "./file-tree";
 import { Modal } from "./modal";
 import { Markdown } from "./markdown";
 import { useLocalSearch } from "@/hooks/use-local-search";
+import { useWorkspaceSession } from "@/hooks/use-workspace-session";
+import { WorkspaceManager } from "./workspace-manager";
+import { RevisionHistory, WorkspaceTrash } from "./recovery";
 import { useReader } from "@/lib/store";
+import {
+  workspaceMetadataPath,
+  workspaceMetadata,
+} from "@/lib/workspace-archive";
 import { readLocalFiles, isolateImport } from "@/lib/import";
 import { storage } from "@/lib/storage";
-import { exampleDocuments } from "@/lib/examples";
 import {
   analyze,
   documentTitle,
@@ -80,6 +86,9 @@ type DialogName =
   | "tags"
   | "analyze"
   | "help"
+  | "workspaces"
+  | "history"
+  | "trash"
   | null;
 
 const IconButton = ({
@@ -117,40 +126,26 @@ export default function Workspace() {
     setMode,
     setPreferences,
   } = useReader();
-  const [loaded, setLoaded] = useState(false);
-  const [assetURLs, setAssetURLs] = useState<Record<string, string>>({});
-  const refreshAssets = useCallback(async () => {
-    const assets = await storage.loadAssets();
-    setAssetURLs(
-      Object.fromEntries(
-        assets.map((asset) => [asset.path, URL.createObjectURL(asset.blob)]),
-      ),
-    );
-  }, []);
-  useEffect(() => {
-    storage
-      .loadAssets()
-      .then((assets) =>
-        setAssetURLs(
-          Object.fromEntries(
-            assets.map((asset) => [
-              asset.path,
-              URL.createObjectURL(asset.blob),
-            ]),
-          ),
-        ),
-      )
-      .catch(() => {});
-  }, [refreshAssets]);
-  useEffect(
-    () => () => {
-      Object.values(assetURLs).forEach((url) => URL.revokeObjectURL(url));
-    },
-    [assetURLs],
-  );
-  const [storageStatus, setStorageStatus] = useState(
-    "Opening local workspace…",
-  );
+  const [toast, setToast] = useState("");
+  const notify = useCallback((message: string) => setToast(message), []);
+  const session = useWorkspaceSession(notify);
+  const {
+    loaded,
+    workspaceId,
+    workspaces,
+    switching,
+    assetURLs,
+    storageStatus,
+    save,
+    flushEdit,
+    scheduleSave,
+    hasPendingChanges,
+    refreshAssets,
+    reloadWorkspaces,
+    switchWorkspace,
+    conflict,
+    resolveConflict,
+  } = session;
   const [dialog, setDialog] = useState<DialogName>(null);
   const [query, setQuery] = useState("");
   const [fileFilter, setFileFilter] = useState("");
@@ -166,7 +161,6 @@ export default function Workspace() {
   const [presentation, setPresentation] = useState(false);
   const [progress, setProgress] = useState(0);
   const [activeHeading, setActiveHeading] = useState("");
-  const [toast, setToast] = useState("");
   const [findOpen, setFindOpen] = useState(false);
   const [find, setFind] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -177,8 +171,6 @@ export default function Workspace() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const filesRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
-  const editTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingEdit = useRef<ReaderDocument | null>(null);
   const doc = documents.find((d) => d.id === activeId);
   const outline = useMemo(() => headings(doc?.content || ""), [doc?.content]);
   const metadata = useMemo(() => stats(doc?.content || ""), [doc?.content]);
@@ -187,76 +179,24 @@ export default function Workspace() {
     (preferences.theme === "system" &&
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const notify = useCallback((message: string) => setToast(message), []);
-  const save = useCallback(
-    async (document: ReaderDocument) => {
-      try {
-        await storage.put(document);
-        setStorageStatus("Saved in this browser");
-      } catch {
-        setStorageStatus("Browser storage unavailable");
-        notify("Could not save locally. Export a backup to keep your changes.");
-      }
-    },
-    [notify],
-  );
-  const flushEdit = useCallback(() => {
-    if (editTimer.current) clearTimeout(editTimer.current);
-    if (pendingEdit.current) {
-      void save(pendingEdit.current);
-      pendingEdit.current = null;
-    }
-  }, [save]);
   useEffect(() => {
-    let canceled = false;
-    storage
-      .load()
-      .then(async (saved) => {
-        if (canceled) return;
-        const docs = saved.length ? saved : exampleDocuments();
-        setDocuments(docs);
-        if (!saved.length) await storage.putAll(docs);
-        let last = "";
-        try {
-          const prefs = JSON.parse(
-            localStorage.getItem("openmdviewer.preferences") || "{}",
-          );
-          setPreferences(prefs);
-          last = localStorage.getItem("openmdviewer.active") || "";
-        } catch {}
-        open(docs.some((d) => d.id === last) ? last : docs[0].id);
-        if (window.innerWidth < 1000) setRightOpen(false);
-        if (window.innerWidth < 750) setLeftOpen(false);
-        setStorageStatus("Saved in this browser");
-        setLoaded(true);
-      })
-      .catch(() => {
-        if (!canceled) {
-          const docs = exampleDocuments();
-          setDocuments(docs);
-          open(docs[0].id);
-          setStorageStatus("Browser storage unavailable");
-          setLoaded(true);
-          notify(
-            "Local storage could not be opened. Download your files before closing.",
-          );
-        }
-      });
-    return () => {
-      canceled = true;
-    };
-  }, [open, setDocuments, setPreferences, notify]);
+    if (!loaded || switching) return;
+    try {
+      localStorage.setItem(
+        "openmdviewer.preferences",
+        JSON.stringify(preferences),
+      );
+      localStorage.setItem(`openmdviewer.active.${workspaceId}`, activeId);
+    } catch {}
+  }, [preferences, activeId, workspaceId, loaded, switching]);
   useEffect(() => {
-    if (loaded) {
-      try {
-        localStorage.setItem(
-          "openmdviewer.preferences",
-          JSON.stringify(preferences),
-        );
-        localStorage.setItem("openmdviewer.active", activeId);
-      } catch {}
-    }
-  }, [preferences, activeId, loaded]);
+    if (!loaded) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (window.innerWidth < 1000) setRightOpen(false);
+      if (window.innerWidth < 750) setLeftOpen(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loaded]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4000);
@@ -265,7 +205,8 @@ export default function Workspace() {
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (
-        pendingEdit.current ||
+        hasPendingChanges() ||
+        conflict ||
         storageStatus === "Browser storage unavailable"
       ) {
         e.preventDefault();
@@ -274,7 +215,7 @@ export default function Workspace() {
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [flushEdit, storageStatus]);
+  }, [flushEdit, storageStatus, conflict, hasPendingChanges]);
   useEffect(() => {
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production")
       navigator.serviceWorker
@@ -300,16 +241,13 @@ export default function Workspace() {
       };
       setDocuments(documents.map((d) => (d.id === doc.id ? updated : d)));
       if (debounce) {
-        pendingEdit.current = updated;
-        setStorageStatus("Saving to browser…");
-        if (editTimer.current) clearTimeout(editTimer.current);
-        editTimer.current = setTimeout(flushEdit, 450);
+        scheduleSave(updated);
       } else {
         flushEdit();
         void save(updated);
       }
     },
-    [doc, documents, setDocuments, save, flushEdit],
+    [doc, documents, setDocuments, save, flushEdit, scheduleSave],
   );
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
@@ -402,12 +340,16 @@ export default function Workspace() {
         imported.assets,
         new Set([
           ...useReader.getState().documents.map((d) => d.path),
-          ...(await storage.loadAssets()).map((a) => a.path),
+          ...(await storage.loadAssets(workspaceId)).map((a) => a.path),
         ]),
       );
       if (additions.length + documents.length > 10000)
         throw new Error("This workspace supports up to 10,000 documents.");
-      await storage.import(additions, imported.assets);
+      for (const added of additions) {
+        added.workspaceId = workspaceId;
+        added.revision = 0;
+      }
+      await storage.import(additions, imported.assets, workspaceId);
       await refreshAssets();
       setDocuments([...useReader.getState().documents, ...additions]);
       if (additions[0]) openDocument(additions[0].id);
@@ -430,8 +372,14 @@ export default function Workspace() {
     const data = Object.fromEntries(
       documents.map((d) => [safePath(d.path), strToU8(d.content)]),
     );
-    for (const asset of await storage.loadAssets())
+    for (const asset of await storage.loadAssets(workspaceId))
       data[asset.path] = new Uint8Array(await asset.blob.arrayBuffer());
+    data[workspaceMetadataPath] = strToU8(
+      workspaceMetadata(
+        documents,
+        workspaces.find((w) => w.id === workspaceId),
+      ),
+    );
     download(
       "openmdviewer-workspace.zip",
       zipSync(data) as BlobPart,
@@ -642,6 +590,35 @@ export default function Workspace() {
               <span>Search files…</span>
               <kbd>⌘ K</kbd>
             </button>
+            <div className="workspace-switcher">
+              <label className="sr-only" htmlFor="workspace-select">
+                Current workspace
+              </label>
+              <select
+                id="workspace-select"
+                value={workspaceId}
+                disabled={switching || !loaded}
+                onChange={async (e) => {
+                  if (await switchWorkspace(e.target.value)) {
+                    setHistory([]);
+                    setCollection("all");
+                    setFileFilter("");
+                  }
+                }}
+              >
+                {workspaces.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.icon} {w.name}
+                  </option>
+                ))}
+              </select>
+              <IconButton
+                label="Manage workspaces"
+                onClick={() => setDialog("workspaces")}
+              >
+                <Settings2 size={14} />
+              </IconButton>
+            </div>
             <div className="workspace-label">
               <span>WORKSPACE</span>
               <div>
@@ -735,6 +712,14 @@ export default function Workspace() {
               </div>
               <div className="sidebar-footer">
                 <span>YOUR WORDS. YOUR SPACE.</span>
+                <button
+                  className="icon-button"
+                  title="Workspace trash"
+                  aria-label="Workspace trash"
+                  onClick={() => setDialog("trash")}
+                >
+                  <History size={15} />
+                </button>
                 <a
                   href="https://github.com/SkillsetSquad/openmdviewer"
                   target="_blank"
@@ -942,7 +927,7 @@ export default function Workspace() {
               </Suspense>
             </section>
           )}
-          {mode !== "source" && (
+          {(mode !== "source" || !doc) && (
             <div
               className="document-viewport"
               ref={viewportRef}
@@ -1104,7 +1089,7 @@ export default function Workspace() {
           </span>
         </div>
       </div>
-      {rightOpen && !focus && (
+      {rightOpen && !focus && doc && (
         <>
           <div
             className="resize-handle right-resize"
@@ -1385,6 +1370,78 @@ export default function Workspace() {
                   <button onClick={() => window.print()}>
                     <Printer size={14} />
                     Print<kbd>⌘ P</kbd>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await flushEdit();
+                      setDialog("history");
+                    }}
+                  >
+                    <History size={14} />
+                    Version history
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!doc) return;
+                      try {
+                        const paths = new Set(documents.map((d) => d.path));
+                        let n = 2;
+                        let path = doc.path.replace(
+                          /(\.[^.]*)?$/,
+                          ` (copy ${n})$1`,
+                        );
+                        while (paths.has(path))
+                          path = doc.path.replace(
+                            /(\.[^.]*)?$/,
+                            ` (copy ${++n})$1`,
+                          );
+                        const created = await storage.put({
+                          ...newDocument(path, doc.content),
+                          workspaceId,
+                          tags: doc.tags,
+                        });
+                        setDocuments([
+                          ...useReader.getState().documents,
+                          created,
+                        ]);
+                        openDocument(created.id);
+                        notify("Document duplicated in this workspace.");
+                      } catch {
+                        notify("Could not duplicate this document.");
+                      }
+                    }}
+                  >
+                    <Copy size={14} />
+                    Duplicate document
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!doc || !(await flushEdit())) return;
+                      try {
+                        const current = useReader
+                          .getState()
+                          .documents.find((d) => d.id === doc.id)!;
+                        await storage.trash(current, current.revision || 0);
+                        setDocuments(
+                          useReader
+                            .getState()
+                            .documents.filter((d) => d.id !== doc.id),
+                        );
+                        closeTab(doc.id);
+                        notify(
+                          "Moved to workspace trash. You can restore it at any time.",
+                        );
+                      } catch (error) {
+                        notify(
+                          error instanceof Error
+                            ? error.message
+                            : "Could not move the document to trash.",
+                        );
+                      }
+                    }}
+                  >
+                    <X size={14} />
+                    Move to trash
                   </button>
                   <button onClick={() => setDialog("analyze")}>
                     <CheckCheck size={14} />
@@ -1717,6 +1774,7 @@ export default function Workspace() {
                     `# ${fileName(path).replace(/\.[^.]+$/, "")}\n\nYour next idea starts here.\n`,
                   );
                   try {
+                    added.workspaceId = workspaceId;
                     await storage.put(added);
                     setDocuments([...documents, added]);
                     openDocument(added.id);
@@ -1890,6 +1948,99 @@ export default function Workspace() {
                 <p>No issues found in these checks.</p>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+      {switching && (
+        <div className="workspace-loading" role="status">
+          Opening workspace…
+        </div>
+      )}
+      {dialog === "workspaces" && (
+        <WorkspaceManager
+          workspaces={workspaces}
+          current={workspaceId}
+          onChanged={reloadWorkspaces}
+          onSwitch={async (id) => {
+            const changed = await switchWorkspace(id);
+            if (changed) {
+              setHistory([]);
+              setCollection("all");
+              setFileFilter("");
+            }
+            return changed;
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === "history" && doc && (
+        <RevisionHistory
+          document={doc}
+          onClose={() => setDialog(null)}
+          onRestore={async (content) => {
+            const restored = { ...doc, content, updatedAt: Date.now() };
+            const ok = await save(restored, "restore");
+            if (ok) {
+              setDocuments(
+                useReader
+                  .getState()
+                  .documents.map((d) =>
+                    d.id === doc.id ? { ...restored, revision: d.revision } : d,
+                  ),
+              );
+              notify(
+                "Previous revision restored. The replaced version remains in history.",
+              );
+            }
+            return ok;
+          }}
+        />
+      )}
+      {dialog === "trash" && (
+        <WorkspaceTrash
+          workspaceId={workspaceId}
+          onClose={() => setDialog(null)}
+          onRestore={(restored) => {
+            setDocuments([...useReader.getState().documents, restored]);
+            notify(`Restored ${restored.path}.`);
+          }}
+        />
+      )}
+      {conflict && (
+        <Modal
+          title="This document changed in another tab"
+          dismissible={false}
+          onClose={() => {}}
+        >
+          <p className="dialog-description">
+            Your edits have not overwritten the saved version of{" "}
+            {conflict.local.path}. Preserve both versions as separate documents,
+            or load the saved version.
+          </p>
+          <div className="dialog-buttons">
+            <Button
+              variant="outline"
+              onClick={() =>
+                download(
+                  conflict.local.path,
+                  useReader
+                    .getState()
+                    .documents.find((d) => d.id === conflict.local.id)
+                    ?.content || conflict.local.content,
+                )
+              }
+            >
+              Download my edits
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void resolveConflict(false)}
+            >
+              Load saved version
+            </Button>
+            <Button onClick={() => void resolveConflict(true)}>
+              Keep both versions
+            </Button>
           </div>
         </Modal>
       )}

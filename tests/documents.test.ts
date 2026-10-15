@@ -144,3 +144,60 @@ describe("source-preserving imports", () => {
     ).rejects.toThrow("conflicting paths");
   });
 });
+
+import {
+  workspaceMetadata,
+  workspaceMetadataPath,
+  applyWorkspaceMetadata,
+} from "../src/lib/workspace-archive";
+describe("portable workspace metadata", () => {
+  it("round-trips tags, favorites, and document dates with ZIP imports", async () => {
+    const original = {
+      ...newDocument("Notes/Test.md", "# Portable"),
+      tags: ["guide", "private"],
+      favorite: true,
+      createdAt: 1000,
+      updatedAt: 2000,
+    };
+    const { zipSync, strToU8 } = await import("fflate");
+    const archive = zipSync({
+      "Notes/Test.md": strToU8(original.content),
+      [workspaceMetadataPath]: strToU8(workspaceMetadata([original])),
+    });
+    const imported = await readLocalFiles([
+      new File([archive as BlobPart], "workspace.zip"),
+    ]);
+    expect(imported.documents[0]).toMatchObject({
+      path: original.path,
+      tags: original.tags,
+      favorite: true,
+      createdAt: 1000,
+      updatedAt: 2000,
+    });
+    expect(imported.documents[0].id).not.toBe(original.id);
+  });
+  it("accepts only known fields from untrusted metadata", () => {
+    const doc = newDocument("A.md", "# A");
+    applyWorkspaceMetadata(
+      [doc],
+      JSON.stringify({
+        format: "openmdviewer",
+        version: 1,
+        documents: [
+          {
+            path: "A.md",
+            id: "hijack",
+            workspaceId: "other",
+            content: "replace",
+            tags: ["a", 8],
+            favorite: true,
+            updatedAt: "bad",
+          },
+        ],
+      }),
+    );
+    expect(doc.id).not.toBe("hijack");
+    expect(doc.content).toBe("# A");
+    expect(doc.tags).toEqual(["a"]);
+  });
+});
