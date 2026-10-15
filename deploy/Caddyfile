@@ -1,0 +1,12 @@
+# Replace this hostname and deploy the contents of out/ to /srv/openmdviewer.
+md.example.com {
+  root * /srv/openmdviewer
+  file_server
+  encode zstd gzip
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer
+    X-Frame-Options DENY
+    Cache-Control no-cache
+  }
+}
