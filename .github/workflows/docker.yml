@@ -1,0 +1,27 @@
+name: Static Docker runtime verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  docker:
+    name: Docker ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: root
+            base: ""
+          - label: subpath
+            base: /reader
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Build and inspect the isolated static runtime
+        run: node scripts/verify-docker.mjs
+        env:
+          TEST_DOCKER_BASE_PATH: ${{ matrix.base }}

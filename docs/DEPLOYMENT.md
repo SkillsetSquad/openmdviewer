@@ -16,7 +16,18 @@ docker compose up --build -d
 
 Visit http://localhost:8080. The image builds with Node.js 24 and runs with Nginx; the runtime image has no Node application process. The container has no document volumes because user documents live in browser IndexedDB. Restarting the container does not erase a workspace, but changing the origin or subpath changes the browser storage context.
 
-The image includes a healthcheck and security headers. Docker runtime execution must be verified on the target host; availability of a Dockerfile is not proof of a production deployment.
+The image includes a healthcheck and security headers on HTML, hashed assets, service workers and error responses. Location-level cache headers explicitly retain those security headers because Nginx does not inherit parent `add_header` directives once a location declares its own ([Nginx documentation](https://nginx.org/en/docs/http/ngx_http_headers_module.html#add_header)).
+
+The **Static Docker runtime verification** workflow (`.github/workflows/docker.yml`) can be dispatched on a desired ref. It builds the actual Dockerfile in independent root and `/reader` jobs, runs each image on a random loopback-only port, and checks static HTML/JavaScript, manifest scope, service-worker prefixes, cache/security headers, real 404s, the image's actual health command, valid Nginx configuration, and the absence of Node/npm commands in the serving container. It does not publish an image or deploy a host.
+
+On a machine with a running Docker daemon, run the same checks directly:
+
+```sh
+node scripts/verify-docker.mjs
+TEST_DOCKER_BASE_PATH=/reader node scripts/verify-docker.mjs
+```
+
+The verifier creates uniquely named test images/containers and stops/removes its own started test container and image. It does not prune Docker caches, touch existing services, or mount user document directories. Docker runtime execution must still be verified on the intended production host; a passing CI container check is not proof of that host's network, TLS, permissions or production deployment. The development Mac's Docker daemon was unavailable during setup, so CI results and target-host results must be distinguished.
 
 ## Nginx
 

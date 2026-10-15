@@ -32,6 +32,7 @@
 - Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` for relevant changes; exercise core flows with Playwright.
 - Preserve legacy Blob assets. Retry only the exact native Blob-preparation failure after transaction rollback, serialize fallback bytes outside the transaction, reconstruct Blobs at the storage boundary, and repeat all source/token/path checks on retry. Do not retry quota or unrelated persistence failures. During legacy upgrades, use Dexie.waitFor while preparing one readable asset at a time and preserve the original legacy records.
 - Keep cross-browser verification independent of host browser profiles and privacy settings. Reuse real reader contracts, run serially against isolated static output, retain failure evidence, and distinguish Playwright engine coverage from shipping-browser certification.
+- Verify Docker runtime changes against isolated, uniquely named root/subpath test containers on loopback. Check real HTTP headers/status, the actual health command and Node-free runtime; remove only verifier-owned resources, never prune or alter unrelated containers.
 - Keep deployment reproducible with npm lockfile, static Pages workflow, and a Node-free runtime Docker image.
 
 <!-- BEGIN:nextjs-agent-rules -->
