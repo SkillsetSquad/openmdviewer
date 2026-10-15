@@ -225,6 +225,8 @@ export default function Workspace() {
           last = localStorage.getItem("openmdviewer.active") || "";
         } catch {}
         open(docs.some((d) => d.id === last) ? last : docs[0].id);
+        if (window.innerWidth < 1000) setRightOpen(false);
+        if (window.innerWidth < 750) setLeftOpen(false);
         setStorageStatus("Saved in this browser");
         setLoaded(true);
       })

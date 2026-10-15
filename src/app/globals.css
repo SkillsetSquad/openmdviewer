@@ -2239,3 +2239,17 @@ kbd {
   max-height: 70vh;
   object-fit: contain;
 }
+@media (max-width: 1000px) {
+  .right-sidebar {
+    display: block;
+    position: absolute;
+    right: 0;
+    top: 53px;
+    bottom: 25px;
+    z-index: 30;
+    box-shadow: -15px 0 45px #0007;
+  }
+  .toolbar > .icon-button:last-child {
+    display: inline-flex;
+  }
+}

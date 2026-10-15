@@ -111,11 +111,20 @@ test("mobile reader opens files without horizontal overflow", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Open file navigation" }).click();
   await expect(page.getByText("15 documents, all local")).toBeVisible();
   await page.getByRole("button", { name: "Close file navigation" }).click();
   await expect(
     page.getByRole("heading", { name: "Configuration Guide", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Toggle document details" }).click();
+  await expect(
+    page.getByRole("complementary", { name: "Document details" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Toggle document details" }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
