@@ -104,6 +104,7 @@ import type {
   TextQuote,
 } from "@/lib/types";
 const ConversionDialog = lazy(() => import("./conversion-dialog"));
+const DocxExportDialog = lazy(() => import("./docx-export-dialog"));
 const SiteExportDialog = lazy(() => import("./site-export-dialog"));
 const LocalDirectoryDialog = lazy(() => import("./local-directory-dialog"));
 const LocalFileDialog = lazy(() => import("./local-file-dialog"));
@@ -119,6 +120,7 @@ type DialogName =
   | "new"
   | "rename"
   | "export"
+  | "exportDocx"
   | "exportSite"
   | "convertImport"
   | "localDirectory"
@@ -789,6 +791,9 @@ export default function Workspace() {
           break;
         case "exportZip":
           await exportZip();
+          break;
+        case "exportDocx":
+          if (doc) setDialog("exportDocx");
           break;
         case "exportSite":
           setDialog("exportSite");
@@ -2096,6 +2101,41 @@ export default function Workspace() {
           />
         </Suspense>
       )}
+      {dialog === "exportDocx" && doc && (
+        <Suspense
+          fallback={
+            <Modal title="Export Word document" onClose={() => setDialog(null)}>
+              <p role="status">Loading Word exporter…</p>
+            </Modal>
+          }
+        >
+          <DocxExportDialog
+            path={doc.path}
+            onBusy={setLocalFileBusy}
+            onClose={() => setDialog(null)}
+            snapshot={async () => {
+              if (!(await flushEdit()))
+                throw new Error(
+                  "Resolve pending browser saves before exporting.",
+                );
+              const state = useReader.getState(),
+                current = state.documents.find((item) => item.id === doc.id);
+              if (state.workspaceId !== workspaceId || !current)
+                throw new Error(
+                  "The selected document changed. Reopen the exporter.",
+                );
+              const path = current.path,
+                content = current.content;
+              const assets = await storage.loadAssets(workspaceId);
+              return {
+                path,
+                content,
+                assets: assets.map(({ path, blob }) => ({ path, blob })),
+              };
+            }}
+          />
+        </Suspense>
+      )}
       {dialog === "exportSite" && (
         <Suspense
           fallback={
@@ -2541,6 +2581,14 @@ export default function Workspace() {
               <span>
                 <strong>HTML document</strong>
                 <small>Standalone document · media as references</small>
+              </span>
+              <ArrowDownToLine size={16} />
+            </button>
+            <button onClick={() => setDialog("exportDocx")}>
+              <FileText />
+              <span>
+                <strong>Word document</strong>
+                <small>Editable DOCX with local images and tables</small>
               </span>
               <ArrowDownToLine size={16} />
             </button>

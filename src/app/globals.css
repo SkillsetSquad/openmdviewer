@@ -4790,3 +4790,49 @@ kbd {
     width: 100%;
   }
 }
+
+.docx-export-dialog p,
+.docx-export-summary li {
+  overflow-wrap: anywhere;
+}
+.docx-export-options {
+  margin: 16px 24px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.docx-export-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.docx-export-options select {
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+}
+.docx-export-dialog [role="status"],
+.docx-export-summary {
+  margin: 16px 24px;
+  font-size: 12px;
+}
+.docx-export-summary ul {
+  max-height: 180px;
+  overflow: auto;
+  padding-left: 20px;
+}
+.docx-export-dialog .dialog-buttons {
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .docx-export-dialog .dialog-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .docx-export-dialog .dialog-buttons button {
+    width: 100%;
+  }
+}

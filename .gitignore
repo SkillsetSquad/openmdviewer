@@ -58,3 +58,5 @@ next-env.d.ts
 /public/pdf-assets/
 /public/pdf-resources.zip
 /public/pdf-LICENSE.txt
+
+/public/docx-export-worker.js

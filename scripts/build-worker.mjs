@@ -3,6 +3,7 @@ import { cp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { zipSync } from "fflate";
 const result = await build({
   entryPoints: {
+    "docx-export-worker": "src/workers/docx-export.worker.ts",
     "site-worker": "src/workers/site.worker.ts",
     "conversion-worker": "src/workers/conversion.worker.ts",
     "regex-worker": "src/workers/regex.worker.ts",
@@ -26,7 +27,7 @@ if (
 )
   throw new Error("CLI-only dependencies must not enter browser workers.");
 console.log(
-  "Bundled local search, regex, conversion, website export, analysis, and graph workers.",
+  "Bundled local search, regex, conversion, Word/website export, analysis, and graph workers.",
 );
 
 await cp(

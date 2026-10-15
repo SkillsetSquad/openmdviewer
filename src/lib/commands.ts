@@ -141,6 +141,12 @@ export const commands = [
     document: true,
   },
   {
+    id: "exportDocx",
+    label: "Export Word document",
+    keywords: "download editable docx microsoft office",
+    document: true,
+  },
+  {
     id: "presentation",
     label: "Toggle presentation mode",
     keywords: "slides fullscreen headings",

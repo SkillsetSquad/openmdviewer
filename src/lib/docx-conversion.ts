@@ -95,6 +95,7 @@ export async function docxToHtml(bytes: ArrayBuffer, outputPath: string) {
     {
       externalFileAccess: false,
       includeEmbeddedStyleMap: false,
+      styleMap: ["p[style-name='Title'] => h1:fresh"],
       idPrefix: "docx-",
       convertImage: mammoth.images.imgElement(async (image) => {
         const ext = imageExtension(image.contentType);
