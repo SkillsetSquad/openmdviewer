@@ -612,3 +612,70 @@ test("applies an application update after preserving pending edits", async ({
     await writeFile(script, original);
   }
 });
+
+test("finishes a slow import in its original workspace after switching projects", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Manage workspaces", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "New workspace", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Workspace name", exact: true })
+    .fill("Other project");
+  await page
+    .getByRole("button", { name: "Create workspace", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "A little space for your words." }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Current workspace" })
+    .selectOption("default");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    const original = File.prototype.arrayBuffer;
+    File.prototype.arrayBuffer = async function () {
+      if (this.name === "Slow.md")
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      return original.call(this);
+    };
+  });
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Slow.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Imported into the original project"),
+    });
+  await page
+    .getByRole("combobox", { name: "Current workspace" })
+    .selectOption({ label: "📁 Other project" });
+  await expect(
+    page.getByText(
+      "Import completed in the previous workspace. Switch back to view it.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "A little space for your words." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Slow.md", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("combobox", { name: "Current workspace" })
+    .selectOption("default");
+  await page.getByRole("button", { name: "Slow.md", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Imported into the original project" }),
+  ).toBeVisible();
+});

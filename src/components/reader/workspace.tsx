@@ -330,15 +330,16 @@ export default function Workspace() {
         notify("Choose Markdown, text, media files, or a ZIP containing them.");
         return;
       }
+      const existingDocuments = await storage.load(workspaceId);
       isolateImport(
         additions,
         imported.assets,
         new Set([
-          ...useReader.getState().documents.map((d) => d.path),
+          ...existingDocuments.map((d) => d.path),
           ...(await storage.loadAssets(workspaceId)).map((a) => a.path),
         ]),
       );
-      if (additions.length + documents.length > 10000)
+      if (additions.length + existingDocuments.length > 10000)
         throw new Error("This workspace supports up to 10,000 documents.");
       for (const added of additions) {
         added.workspaceId = workspaceId;
@@ -346,6 +347,12 @@ export default function Workspace() {
       }
       await storage.import(additions, imported.assets, workspaceId);
       await refreshAssets();
+      if (useReader.getState().workspaceId !== workspaceId) {
+        notify(
+          "Import completed in the previous workspace. Switch back to view it.",
+        );
+        return;
+      }
       setDocuments([...useReader.getState().documents, ...additions]);
       if (additions[0]) openDocument(additions[0].id);
       notify(
@@ -1395,6 +1402,12 @@ export default function Workspace() {
                           workspaceId,
                           tags: doc.tags,
                         });
+                        if (useReader.getState().workspaceId !== workspaceId) {
+                          notify(
+                            "The copy was saved in the previous workspace.",
+                          );
+                          return;
+                        }
                         setDocuments([
                           ...useReader.getState().documents,
                           created,

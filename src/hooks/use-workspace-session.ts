@@ -57,6 +57,7 @@ function applyDocuments(documents: ReaderDocument[], workspaceId: string) {
     : documents[0]?.id || "";
   useReader.setState({
     documents,
+    workspaceId,
     activeId: id,
     tabs: id ? [id] : [],
     mode: "read",
@@ -83,7 +84,9 @@ export function useWorkspaceSession(notify: (message: string) => void) {
   const editTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshAssets = useCallback(
     async (id = workspaceId) => {
-      setAssetURLs(urlsFor(await storage.loadAssets(id)));
+      const assets = await storage.loadAssets(id);
+      if (useReader.getState().workspaceId === id)
+        setAssetURLs(urlsFor(assets));
     },
     [workspaceId],
   );

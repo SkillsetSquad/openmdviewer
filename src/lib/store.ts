@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Preferences, ReaderDocument, ReadingMode } from "./types";
 interface ReaderState {
+  workspaceId: string;
   documents: ReaderDocument[];
   activeId: string;
   tabs: string[];
@@ -13,6 +14,7 @@ interface ReaderState {
   setPreferences: (preferences: Partial<Preferences>) => void;
 }
 export const useReader = create<ReaderState>((set) => ({
+  workspaceId: "default",
   documents: [],
   activeId: "example-0",
   tabs: ["example-0"],
