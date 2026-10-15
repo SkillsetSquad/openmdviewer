@@ -27,3 +27,5 @@ When more than one document is open, the active tab is a keyboard stop. Left/Rig
 Notes and bookmarks opens local reading items for the current document. See [reading data](ANNOTATIONS.md).
 
 **Local file / Save As** opens explicit file-connection controls. Browser autosave and Ctrl/Cmd S downloads retain their existing behavior. See [connected-file support](LOCAL_FILES.md).
+
+**Open local folder** now opens connected-folder controls, with a native read-only preview and a folder-copy import fallback. See [connected folders](LOCAL_FOLDERS.md).

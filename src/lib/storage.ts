@@ -1,3 +1,7 @@
+import type {
+  DirectoryImport,
+  LocalDirectorySource,
+} from "./local-directory-types";
 import type { LocalFileSource } from "./local-file-types";
 import Dexie, { type EntityTable, type Table } from "dexie";
 import type {
@@ -37,6 +41,7 @@ export function createStorage(name = "openmdviewer") {
     snapshots: EntityTable<DocumentSnapshot, "id">;
     searchHistory: Table<RecentSearch, [string, string]>;
     fileSources: EntityTable<LocalFileSource, "documentId">;
+    directorySources: EntityTable<LocalDirectorySource, "workspaceId">;
   };
   db.version(1).stores({ documents: "id, path, updatedAt, favorite" });
   db.version(2).stores({
@@ -70,6 +75,7 @@ export function createStorage(name = "openmdviewer") {
     });
   db.version(4).stores({ searchHistory: "[workspaceId+key], workspaceId" });
   db.version(5).stores({ fileSources: "documentId, workspaceId" });
+  db.version(6).stores({ directorySources: "workspaceId" });
   const scoped = (id = "default") =>
     db.documents.where("workspaceId").equals(id);
   async function ensurePath(doc: ReaderDocument) {
@@ -106,6 +112,115 @@ export function createStorage(name = "openmdviewer") {
   }
   const api = {
     close: () => db.close(),
+    directorySource: (workspaceId: string) =>
+      db.directorySources.get(workspaceId),
+    directorySources: () => db.directorySources.toArray(),
+    connectDirectory: (
+      bundle: DirectoryImport,
+      expectedToken: string | null = null,
+    ) =>
+      db.transaction(
+        "rw",
+        [
+          db.workspaces,
+          db.documents,
+          db.workspaceAssets,
+          db.fileSources,
+          db.directorySources,
+        ],
+        async () => {
+          const id = bundle.source.workspaceId;
+          const current = await db.directorySources.get(id);
+          if ((current?.token || null) !== expectedToken)
+            throw new Error(
+              "Another tab changed this folder connection. Scan again before adding files.",
+            );
+          if (
+            bundle.workspace.id !== id ||
+            bundle.documents.length !== bundle.files.length
+          )
+            throw new Error("Invalid folder connection workspace.");
+          if (!expectedToken) await db.workspaces.add(bundle.workspace);
+          else if (!(await db.workspaces.get(id)))
+            throw new Error("This workspace is no longer available.");
+          const paths = new Set<string>();
+          const previous = new Set(
+            current?.entries.map((entry) => entry.path) || [],
+          );
+          const assets = await db.workspaceAssets
+            .where("workspaceId")
+            .equals(id)
+            .toArray();
+          const existingAssets = new Set(assets.map((asset) => asset.path));
+          const ids = new Set<string>();
+          const fileById = new Map(
+            bundle.files.map((file) => [file.documentId, file]),
+          );
+          const entryById = new Map(
+            bundle.source.entries
+              .filter((entry) => entry.documentId)
+              .map((entry) => [entry.documentId!, entry.path]),
+          );
+          for (const doc of bundle.documents) {
+            const file = fileById.get(doc.id);
+            if (
+              doc.workspaceId !== id ||
+              file?.workspaceId !== id ||
+              file.directoryId !== id ||
+              entryById.get(doc.id) !== doc.path ||
+              ids.has(doc.id) ||
+              paths.has(doc.path) ||
+              previous.has(doc.path) ||
+              existingAssets.has(doc.path)
+            )
+              throw new Error("Invalid or conflicting folder document path.");
+            await ensurePath(doc);
+            ids.add(doc.id);
+            paths.add(doc.path);
+          }
+          for (const asset of bundle.assets) {
+            if (
+              asset.workspaceId !== id ||
+              paths.has(asset.path) ||
+              previous.has(asset.path) ||
+              existingAssets.has(asset.path) ||
+              (await db.documents
+                .where("[workspaceId+path]")
+                .equals([id, asset.path])
+                .count())
+            )
+              throw new Error(
+                "That folder path already exists in the browser workspace.",
+              );
+            paths.add(asset.path);
+          }
+          if ((await scoped(id).count()) + bundle.documents.length > 10000)
+            throw new Error("This workspace supports up to 10,000 documents.");
+          await db.documents.bulkAdd(bundle.documents);
+          await db.workspaceAssets.bulkAdd(bundle.assets);
+          await db.fileSources.bulkAdd(bundle.files);
+          await db.directorySources.put(bundle.source);
+        },
+      ),
+    disconnectDirectory: (workspaceId: string, expectedToken: string) =>
+      db.transaction("rw", db.directorySources, db.fileSources, async () => {
+        if (
+          (await db.directorySources.get(workspaceId))?.token !== expectedToken
+        )
+          throw new Error(
+            "Another tab changed this folder connection. Reopen folder controls.",
+          );
+        await db.directorySources.delete(workspaceId);
+        const sources = await db.fileSources
+          .where("workspaceId")
+          .equals(workspaceId)
+          .toArray();
+        await db.fileSources.bulkDelete(
+          sources
+            .filter((source) => source.directoryId === workspaceId)
+            .map((source) => source.documentId),
+        );
+      }),
     fileSource: (documentId: string) => db.fileSources.get(documentId),
     fileSources: (workspaceId: string) =>
       db.fileSources.where("workspaceId").equals(workspaceId).toArray(),

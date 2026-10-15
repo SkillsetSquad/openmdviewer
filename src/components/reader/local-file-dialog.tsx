@@ -41,6 +41,7 @@ export default function LocalFileDialog({
   onLoaded,
   onDownload,
   onImport,
+  onFolder,
   onBusy,
   onClose,
 }: {
@@ -54,6 +55,7 @@ export default function LocalFileDialog({
   ) => Promise<ReaderDocument | null>;
   onDownload: () => void;
   onImport: () => void;
+  onFolder: () => void;
   onBusy: (busy: boolean) => void;
   onClose: () => void;
 }) {
@@ -206,7 +208,13 @@ export default function LocalFileDialog({
       );
   }
   async function remember(plan: Plan, disk: DiskFile, content: string) {
+    const previous = await storage.fileSource(plan.snapshot.id);
+    const directoryId =
+      previous?.directoryId && (await previous.handle.isSameEntry(plan.handle))
+        ? previous.directoryId
+        : undefined;
     const next: LocalFileSource = {
+      directoryId,
       documentId: plan.snapshot.id,
       workspaceId,
       name: disk.name,
@@ -497,6 +505,9 @@ export default function LocalFileDialog({
               </p>
             )}
             <div className="local-file-actions">
+              <button type="button" disabled={busy} onClick={onFolder}>
+                Local folder controls…
+              </button>
               {canOpen ? (
                 <button type="button" disabled={busy} onClick={openFile}>
                   <FileUp size={16} />

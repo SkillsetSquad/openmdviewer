@@ -10,6 +10,9 @@ export interface DiskFile {
   lineEnding: "crlf" | "lf" | "mixed";
 }
 export interface FilePickerWindow extends Window {
+  showDirectoryPicker?: (options: {
+    mode: "read";
+  }) => Promise<import("./local-directory-types").LocalDirectoryHandle>;
   showOpenFilePicker?: (options: {
     multiple: boolean;
     excludeAcceptAllOption: boolean;
@@ -152,7 +155,7 @@ export function beginFileRequest<T>(request: () => Promise<T>): Promise<T> {
   }
 }
 export function filePermission(
-  handle: LocalFileHandle,
+  handle: Pick<LocalFileHandle, "requestPermission">,
   mode: "read" | "readwrite",
 ) {
   // Invoke directly in the click handler, before hashing, storage reads, or other awaits consume activation.

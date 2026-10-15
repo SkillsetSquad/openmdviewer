@@ -98,6 +98,7 @@ import type {
   ReaderAnnotation,
   TextQuote,
 } from "@/lib/types";
+const LocalDirectoryDialog = lazy(() => import("./local-directory-dialog"));
 const LocalFileDialog = lazy(() => import("./local-file-dialog"));
 const Annotations = lazy(() => import("./annotations"));
 const CommandPalette = lazy(() => import("./command-palette"));
@@ -111,6 +112,7 @@ type DialogName =
   | "new"
   | "rename"
   | "export"
+  | "localDirectory"
   | "localFile"
   | "tags"
   | "analyze"
@@ -713,7 +715,7 @@ export default function Workspace() {
           filesRef.current?.click();
           break;
         case "folder":
-          folderRef.current?.click();
+          setDialog("localDirectory");
           break;
         case "new":
           setFormValue("Untitled.md");
@@ -1061,7 +1063,7 @@ export default function Workspace() {
                 </IconButton>
                 <IconButton
                   label="Open folder"
-                  onClick={() => folderRef.current?.click()}
+                  onClick={() => setDialog("localDirectory")}
                 >
                   <FolderOpen size={15} />
                 </IconButton>
@@ -2049,6 +2051,55 @@ export default function Workspace() {
           />
         </Suspense>
       )}
+      {dialog === "localDirectory" && (
+        <Suspense
+          fallback={
+            <Modal
+              title="Local folder connection"
+              onClose={() => setDialog(null)}
+            >
+              <p role="status">Loading folder controls…</p>
+            </Modal>
+          }
+        >
+          <LocalDirectoryDialog
+            workspaceId={workspaceId}
+            flush={flushEdit}
+            onBusy={setLocalFileBusy}
+            onClose={() => setDialog(null)}
+            onImport={() => {
+              folderRef.current?.click();
+              setDialog(null);
+            }}
+            onInspect={(id) => {
+              openDocument(id);
+              setDialog("localFile");
+            }}
+            onChanged={async (id, added) => {
+              await reloadWorkspaces();
+              if (id !== workspaceId) {
+                if (await switchWorkspace(id)) {
+                  setHistory([]);
+                  setCollection("all");
+                  setFileFilter("");
+                  setDialog(null);
+                }
+              } else if (useReader.getState().workspaceId === id) {
+                const current = useReader.getState().documents;
+                setDocuments([
+                  ...current,
+                  ...added.filter(
+                    (item) => !current.some((doc) => doc.id === item.id),
+                  ),
+                ]);
+                if (!useReader.getState().activeId && added[0])
+                  openDocument(added[0].id);
+                await refreshAssets(id);
+              }
+            }}
+          />
+        </Suspense>
+      )}
       {dialog === "localFile" && (
         <Suspense
           fallback={
@@ -2065,6 +2116,7 @@ export default function Workspace() {
             doc={doc}
             workspaceId={workspaceId}
             flush={flushEdit}
+            onFolder={() => setDialog("localDirectory")}
             onBusy={setLocalFileBusy}
             onClose={() => setDialog(null)}
             onImport={() => {

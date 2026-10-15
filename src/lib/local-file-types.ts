@@ -7,6 +7,7 @@ export type LocalFileHandle = FileSystemFileHandle & {
   }) => Promise<PermissionState>;
 };
 export interface LocalFileSource {
+  directoryId?: string;
   documentId: string;
   workspaceId: string;
   token: string;

@@ -4565,3 +4565,108 @@ kbd {
   margin-top: 12px;
   color: var(--muted-foreground);
 }
+
+.local-directory-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+.local-directory-body > p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.local-directory-body section {
+  min-width: 0;
+}
+.local-directory-body section > p {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.directory-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 20px 0 12px;
+  font-size: 13px;
+}
+.directory-filter input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--elevated);
+  color: var(--foreground);
+  padding: 8px 10px;
+}
+.directory-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.directory-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.directory-results li > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.directory-results code {
+  overflow-wrap: anywhere;
+}
+.directory-results small {
+  color: var(--muted-foreground);
+}
+.directory-results button {
+  flex-shrink: 0;
+}
+.directory-results button,
+.directory-pages button,
+.directory-add {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--elevated);
+  color: var(--foreground);
+  font-size: 12px;
+  cursor: pointer;
+}
+.directory-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 12px;
+}
+.directory-pages button:disabled,
+.directory-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (max-width: 600px) {
+  .local-directory-body {
+    padding: 16px;
+  }
+}
+
+.directory-help {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  line-height: 1.65;
+}
+.directory-help summary {
+  cursor: pointer;
+  color: var(--foreground);
+}

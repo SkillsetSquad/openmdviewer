@@ -8,7 +8,7 @@ Browser autosave continues to save only to IndexedDB. **Save to connected file**
 
 **Open connected file** uses the browser's native file picker to select one Markdown/text file. The app creates a browser copy and stores its file handle in IndexedDB. Opening an already connected file in the same workspace reopens its cached browser document; use **Reload from disk** to check external changes. Choosing the same file in another workspace creates an independent browser copy and connection.
 
-Connections accept `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`, and `.txt`, up to 30 MB each. Connected files must be valid UTF-8 without NUL bytes; invalid encodings are rejected before writing. Browser text containing NUL characters or incomplete Unicode surrogates is also rejected before opening a writer. MDX remains inert Markdown rather than executable JavaScript. A single-file handle does not grant access to sibling images or other files. Use folder/ZIP imports to include local media until direct directory connections are implemented.
+Connections accept `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`, and `.txt`, up to 30 MB each. Connected files must be valid UTF-8 without NUL bytes; invalid encodings are rejected before writing. Browser text containing NUL characters or incomplete Unicode surrogates is also rejected before opening a writer. MDX remains inert Markdown rather than executable JavaScript. A single-file handle does not grant access to sibling images or other files. Use [connected folders](LOCAL_FOLDERS.md) or folder/ZIP imports to include local media.
 
 The browser document path and connected file are distinct and displayed together. Browser rename, move, duplication, trash, or restore operations do not rename, move, duplicate, or delete disk files. Duplicated documents do not inherit the original's connection. **Save As** chooses a new target and, after verification, connects this document to it. **Disconnect file** removes only the browser's connection record; its cached document and disk file are preserved.
 
@@ -40,6 +40,6 @@ Native picker support is detected in the current secure browser context. When un
 
 Automated Chromium checks use genuine OPFS `FileSystemFileHandle` objects and native writable streams, including structured-clone persistence in IndexedDB, byte verification, BOM/CRLF preservation, denied permissions, external changes, stale tabs, workspace isolation, and offline writes. Native picker functions are substituted to return these isolated test handles. The operating-system picker dialogs and writes to a user-selected real filesystem location have not been manually certified. OPFS is used by these tests, not yet as the application's large-workspace storage backend.
 
-Direct folder handles, directory rescanning, filesystem rename/move/delete, batch disk saves, OPFS-backed workspace collections, and source-file watching remain roadmap work.
+[Connected folders](LOCAL_FOLDERS.md) retain directory handles and provide explicit read-only rescans with safe new-path additions. Filesystem rename/move/delete, batch disk saves, OPFS-backed workspace collections, and source-file watching remain roadmap work.
 
 Browser API references: [Chrome File System Access guidance](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access) and the [File System Standard](https://fs.spec.whatwg.org/).

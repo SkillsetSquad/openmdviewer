@@ -42,7 +42,7 @@ Remote Markdown images, audio, video, posters, and captions are blocked until in
 
 ## Roadmap and current boundaries
 
-The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. OPFS workspace storage, direct directory management, richer format conversion, repository browsing, browser AI, encryption, lifecycle workflows, and workspace publishing remain future work. No placeholder buttons advertise these features.
+The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. OPFS workspace storage, physical directory create/rename/move/delete operations, richer format conversion, repository browsing, browser AI, encryption, lifecycle workflows, and workspace publishing remain future work. No placeholder buttons advertise these features.
 
 Core browser flows have automated Chromium coverage. Firefox, Safari, large-workspace benchmarks, and complete WCAG 2.2 AA conformance have not yet been certified. Folder selection depends on browser support; individual files and ZIP provide portable alternatives. Imported images and media are stored with their relative paths in IndexedDB and included in workspace ZIP exports. Image rendering is local; arbitrary active media is never executed.
 
@@ -60,3 +60,5 @@ npm run test:e2e
 Tests cover path safety, heading anchors, link analysis, untrusted input, imports/exports, editing persistence, themes, navigation, math, diagrams, mobile overflow, serious/critical axe findings, and offline startup with lazy modules. CI runs these checks before publishing the static Pages artifact.
 
 See [AGENTS.md](AGENTS.md) before making changes. Commit every completed logical change. [MIT licensed](LICENSE); [asset credits](docs/ASSETS.md).
+
+Connected folders can be opened as separate workspaces with retained native handles, relative local media, explicit change scans, and safe additions. Existing changed/missing contents are preserved for review. See [local folder connections](docs/LOCAL_FOLDERS.md) for usage, limits, verification boundaries, and remaining directory operations.

@@ -14,6 +14,7 @@
 - Imported Markdown/MDX is untrusted. Sanitize HTML, disallow executable MDX, keep remote media blocked until explicit consent, and use Mermaid strict security.
 - Keep expensive optional rendering lazy. Preserve local files; browser autosave must never imply disk writes.
 - Native file picker and permission calls must start in their click handler before asynchronous preparation. Keep explicit disk writes in `src/lib/local-files.ts`, separate from browser autosave.
+- Keep directory scans read-only, explicit, bounded and cancellable. Preserve relative paths; atomically add new paths with connection-token checks. Changed and missing entries must retain cached browser versions until explicit file review. Keep directory handles out of portable exports.
 - Coordinate connected-file operations across tabs, recheck disk bytes and browser revisions before committing, and verify the closed file before advancing connection baselines. External changes require review; file handles must stay out of portable exports.
 - Support root and subpath deployments. All assets must be self-hosted and offline-capable.
 
