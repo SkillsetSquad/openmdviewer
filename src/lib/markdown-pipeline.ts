@@ -21,6 +21,11 @@ export const markdownSchema = {
   ],
   attributes: {
     ...defaultSchema.attributes,
+    code: [
+      ...(defaultSchema.attributes?.code || []),
+      "dataCodeMeta",
+      "dataCodeBlock",
+    ],
     audio: ["src", "title"],
     video: ["src", "poster", "title"],
     source: ["src", "type"],
@@ -40,6 +45,16 @@ export const markdownSchema = {
 export function remarkReaderExtensions() {
   return (tree: MdRoot, file: VFile) => {
     const source = String(file.value || "");
+    visit(tree, "code", (node) => {
+      node.data = {
+        ...node.data,
+        hProperties: {
+          ...node.data?.hProperties,
+          dataCodeMeta: (node.meta || "").slice(0, 1000),
+          dataCodeBlock: true,
+        },
+      };
+    });
     visit(tree, "blockquote", (node: Blockquote) => {
       const paragraph = node.children[0];
       if (paragraph?.type !== "paragraph") return;

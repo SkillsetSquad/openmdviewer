@@ -2,7 +2,7 @@
 
 **Your words. Your space.** A free, open-source Markdown reader and local knowledge workspace by SkillsetSquad. A compact, three-pane interface with a file tree, a focused reading surface, and contextual document navigation.
 
-[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Tables](docs/TABLES.md) · [Images](docs/IMAGES.md) · [Audio/video](docs/MEDIA.md) · [Notes/bookmarks](docs/ANNOTATIONS.md) · [Contributor instructions](AGENTS.md)
+[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Tables](docs/TABLES.md) · [Images](docs/IMAGES.md) · [Audio/video](docs/MEDIA.md) · [Notes/bookmarks](docs/ANNOTATIONS.md) · [Code tools](docs/CODE.md) · [Contributor instructions](AGENTS.md)
 
 ## Run locally
 
@@ -25,7 +25,7 @@ The `out/` directory is the entire application. No application server, accounts,
 ## Available now
 
 - Responsive dark reader inspired by the supplied design: collapsible file tree, breadcrumbs, document tabs, reading toolbar, contents, properties, tags, actions, backlinks, and an interactive workspace graph with search, tag/connection filters, neighborhood exploration, zoom/pan, and an accessible document list.
-- CommonMark/GFM, YAML/TOML/JSON frontmatter, wiki/reference links, safe heading and footnote navigation, sortable tables with whole-table and column filters, cell/row copying, CSV/JSON export, resizing, pagination, numeric summaries, and full-viewport viewing, task lists, footnotes, sanitized HTML, KaTeX, lazy Shiki highlighting with line numbers/copy/download/folding, strict Mermaid diagrams with zoom/source/SVG export.
+- CommonMark/GFM, YAML/TOML/JSON frontmatter, wiki/reference links, safe heading and footnote navigation, sortable tables with whole-table and column filters, cell/row copying, CSV/JSON export, resizing, pagination, numeric summaries, and full-viewport viewing, task lists, footnotes, sanitized HTML, KaTeX, lazy Shiki highlighting with filename labels, line emphasis, wrapping, code search, diff cues, copy/download, line paging, folding, and a scratch editor, strict Mermaid diagrams with zoom/source/SVG export.
 - Personal notes, prose highlights, and heading bookmarks with workspace-wide search, conservative passage relocation, JSON export, and ZIP backup/restore. Reading data is stored separately from Markdown source.
 - Native local audio/video playback with speed, WebVTT captions, measured duration/dimensions, original downloads, browser-supported fullscreen/picture-in-picture, and separate remote-media/poster/caption consent.
 - Full-viewport image gallery with zoom/pan, keyboard navigation, local dimensions/type/byte size, original downloads, PNG clipboard copying, and individual remote-image consent.

@@ -27,6 +27,31 @@ const TableRenderer: Components["table"] = ({ children }) => (
   <InteractiveTable>{children}</InteractiveTable>
 );
 
+const PreRenderer: Components["pre"] = ({ children }) => <>{children}</>;
+const CodeRenderer: Components["code"] = ({ className, children, node }) => {
+  const language = /language-([\w+-]+)/.exec(className || "")?.[1] || "";
+  const code = String(children).replace(/\n$/, "");
+  if (language === "mermaid")
+    return (
+      <Suspense fallback={<p>Loading diagram…</p>}>
+        <Diagram source={code} />
+      </Suspense>
+    );
+  if (
+    node?.properties.dataCodeBlock ||
+    language ||
+    String(children).includes("\n")
+  )
+    return (
+      <CodeBlock
+        language={language}
+        code={code}
+        meta={String(node?.properties.dataCodeMeta || "")}
+      />
+    );
+  return <code className={className}>{children}</code>;
+};
+
 export const Markdown = memo(function Markdown({
   content,
   onLink,
@@ -50,20 +75,8 @@ export const Markdown = memo(function Markdown({
         aria-label={checked ? "Completed task" : "Incomplete task"}
       />
     ),
-    pre: ({ children }) => <>{children}</>,
-    code: ({ className, children }) => {
-      const language = /language-([\w+-]+)/.exec(className || "")?.[1] || "";
-      const code = String(children).replace(/\n$/, "");
-      if (language === "mermaid")
-        return (
-          <Suspense fallback={<p>Loading diagram…</p>}>
-            <Diagram source={code} />
-          </Suspense>
-        );
-      if (language || String(children).includes("\n"))
-        return <CodeBlock language={language} code={code} />;
-      return <code className={className}>{children}</code>;
-    },
+    pre: PreRenderer,
+    code: CodeRenderer,
     a: ({ href, children }) => (
       <a
         href={href}

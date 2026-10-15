@@ -3716,3 +3716,225 @@ kbd {
 .annotation-content {
   padding: 0 20px 20px;
 }
+
+/* Code tools preserve the original fenced text while presenting a readable view. */
+.advanced-code .code-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 10px;
+}
+.code-filename {
+  flex: 1;
+  min-width: 70px;
+  overflow-wrap: anywhere;
+  font: 11px/1.5 var(--font-geist-mono);
+  color: var(--foreground);
+}
+.advanced-code .code-toolbar .code-actions {
+  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.advanced-code .code-actions button {
+  min-width: 25px;
+  min-height: 25px;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.advanced-code button[aria-pressed="true"] {
+  color: var(--foreground);
+  background: var(--selection-bg);
+  border-color: var(--border);
+}
+.advanced-code .code-lines {
+  max-height: 540px;
+  padding: 10px 0;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+.advanced-code .code-lines code {
+  display: block;
+  min-width: max-content;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+.advanced-code .code-line {
+  display: block;
+  position: relative;
+  min-height: 1.8em;
+  padding: 0 16px;
+  border-left: 2px solid transparent;
+}
+.advanced-code.code-numbered .code-line {
+  padding-left: 62px;
+}
+.advanced-code.code-numbered .code-line::before {
+  content: attr(data-line);
+  position: absolute;
+  left: 6px;
+  width: 40px;
+  padding-right: 8px;
+  text-align: right;
+  color: var(--muted-foreground);
+  user-select: none;
+}
+.advanced-code.code-wrap .code-lines {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.advanced-code.code-wrap .code-lines code {
+  min-width: 0;
+}
+.advanced-code .code-line-text {
+  white-space: inherit;
+}
+.advanced-code .code-token {
+  font-style: var(--code-dark-style, normal);
+  font-weight: var(--code-dark-weight, 400);
+  text-decoration: var(--code-dark-decoration, none);
+}
+.theme-light .advanced-code .code-token,
+.theme-sepia .advanced-code .code-token {
+  font-style: var(--code-light-style, normal);
+  font-weight: var(--code-light-weight, 400);
+  text-decoration: var(--code-light-decoration, none);
+}
+.advanced-code .code-emphasis {
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  border-left-color: var(--accent-blue);
+}
+.advanced-code .code-diff-added {
+  background: #3aa67420;
+  border-left-color: #3aa674;
+}
+.advanced-code .code-diff-removed {
+  background: #ef646420;
+  border-left-color: #ef6464;
+}
+.advanced-code .code-diff-header {
+  font-weight: 600;
+  background: var(--elevated);
+}
+.advanced-code .code-line-current {
+  box-shadow: inset 0 0 0 1px var(--accent-blue);
+}
+.advanced-code mark {
+  color: #101419;
+  background: #f2d17a;
+  border-radius: 2px;
+}
+.advanced-code mark.code-match-active {
+  background: #ffdd85;
+  outline: 1px solid #d29f2a;
+}
+.code-find {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font: 11px/1.5 var(--font-geist-sans);
+}
+.code-find input {
+  width: 150px;
+  flex: 1;
+  min-width: 100px;
+  max-width: 350px;
+  border: 1px solid var(--border);
+  background: var(--app-bg);
+  color: var(--foreground);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+.code-find button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.code-find [role="status"] {
+  color: var(--muted-foreground);
+  min-width: 90px;
+}
+.code-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  font: 10px/1.6 var(--font-geist-sans);
+}
+.code-pagination button {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+.code-render-note,
+.code-feedback {
+  margin: 0 !important;
+  padding: 7px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font: 11px/1.7 var(--font-geist-sans);
+}
+.snippet-editor-content {
+  padding: 0 20px 20px;
+}
+.snippet-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.snippet-editor-status {
+  margin: 8px 0 0 !important;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+@media print {
+  .advanced-code .code-toolbar,
+  .code-find,
+  .code-pagination,
+  .code-render-note,
+  .code-feedback {
+    display: none !important;
+  }
+  .advanced-code .code-lines {
+    max-height: none;
+    overflow: visible;
+    white-space: pre-wrap;
+  }
+  .advanced-code .code-lines code {
+    min-width: 0;
+  }
+  .advanced-code mark {
+    background: transparent;
+    outline: none;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .theme-system .shiki,
+  .theme-system .shiki span {
+    color: var(--shiki-light) !important;
+  }
+  .theme-system .advanced-code .code-token {
+    font-style: var(--code-light-style, normal);
+    font-weight: var(--code-light-weight, 400);
+    text-decoration: var(--code-light-decoration, none);
+  }
+}
+@media print {
+  .advanced-code .code-line-current {
+    box-shadow: none;
+  }
+}

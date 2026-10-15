@@ -15,7 +15,16 @@ export default function Editor({
   location?: { line: number; token: number } | null;
 }) {
   const viewRef = useRef<EditorView | null>(null);
-  const extensions = useMemo(() => [markdown(), EditorView.lineWrapping], []);
+  const extensions = useMemo(
+    () => [
+      markdown(),
+      EditorView.lineWrapping,
+      EditorView.contentAttributes.of({
+        "aria-label": "Markdown source editor",
+      }),
+    ],
+    [],
+  );
   const focusLine = (view: EditorView, line: number) => {
     const target = view.state.doc.line(
       Math.max(1, Math.min(view.state.doc.lines, line)),
