@@ -26,7 +26,8 @@ export const markdownSchema = {
   },
 };
 export function remarkReaderExtensions() {
-  return (tree: MdRoot) => {
+  return (tree: MdRoot, file: VFile) => {
+    const source = String(file.value || "");
     visit(tree, "blockquote", (node: Blockquote) => {
       const paragraph = node.children[0];
       if (paragraph?.type !== "paragraph") return;
@@ -58,7 +59,22 @@ export function remarkReaderExtensions() {
       const matcher = /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g;
       const replacement: (Text | Link)[] = [];
       let start = 0;
-      for (const match of node.value.matchAll(matcher)) {
+      const matches = [...node.value.matchAll(matcher)];
+      const rawText =
+        node.position && source
+          ? source.slice(node.position.start.offset, node.position.end.offset)
+          : "";
+      const rawMatches = [
+        ...rawText.matchAll(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g),
+      ];
+      let ordinal = 0;
+      for (const match of matches) {
+        const raw = rawMatches[ordinal++];
+        if (source && (!raw || rawMatches.length !== matches.length)) continue;
+        const rawIndex = raw?.index || 0;
+        const slashes =
+          rawText.slice(0, rawIndex).match(/\\+$/)?.[0].length || 0;
+        if (slashes % 2) continue;
         if (match.index! > start)
           replacement.push({
             type: "text",
@@ -68,7 +84,27 @@ export function remarkReaderExtensions() {
           type: "link",
           url: `wiki:${encodeURIComponent(match[1].trim())}`,
           children: [{ type: "text", value: match[2] || match[1] }],
-          position: node.position,
+          position: node.position
+            ? (() => {
+                if (!source || !raw) return node.position;
+                const prefix = rawText.slice(0, rawIndex);
+                const lines = prefix.split("\n");
+                const line = node.position!.start.line + lines.length - 1;
+                const column =
+                  lines.length > 1
+                    ? lines[lines.length - 1].length + 1
+                    : node.position!.start.column + prefix.length;
+                const offset = (node.position!.start.offset || 0) + rawIndex;
+                return {
+                  start: { line, column, offset },
+                  end: {
+                    line,
+                    column: column + raw[0].length,
+                    offset: offset + raw[0].length,
+                  },
+                };
+              })()
+            : undefined,
         });
         start = match.index! + match[0].length;
       }

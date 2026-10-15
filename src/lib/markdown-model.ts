@@ -37,6 +37,7 @@ export interface MarkdownModel {
   frontmatter: ReturnType<typeof frontmatter>;
   headings: ModelHeading[];
   anchors: string[];
+  anchorLocations: { id: string; line: number }[];
   anchorAliases: Record<string, string>;
   links: ModelLink[];
   rawLinks: ModelLink[];
@@ -79,11 +80,12 @@ export function markdownModel(content: string): MarkdownModel {
     return saved;
   }
   const meta = frontmatter(content);
-  const parsed = parser.runSync(parser.parse(meta.body)) as MdRoot;
-  const file = new VFile();
+  const file = new VFile({ value: meta.body });
+  const parsed = parser.runSync(parser.parse(file), file) as MdRoot;
   const rendered = html.runSync(parsed, file) as HtmlRoot;
   const headings: ModelHeading[] = [];
   const anchors: string[] = [];
+  const anchorLocations: { id: string; line: number }[] = [];
   const links: ModelLink[] = [];
   const paragraphs: { text: string; line: number }[] = [];
   let codeBlocks = 0,
@@ -104,7 +106,10 @@ export function markdownModel(content: string): MarkdownModel {
   });
   visit(rendered, "element", (node) => {
     const line = (node.position?.start.line || 1) + meta.lineOffset;
-    if (node.properties.id) anchors.push(String(node.properties.id));
+    if (node.properties.id) {
+      anchors.push(String(node.properties.id));
+      anchorLocations.push({ id: String(node.properties.id), line });
+    }
     if (
       /^h[1-6]$/.test(node.tagName) &&
       node.position &&
@@ -144,6 +149,7 @@ export function markdownModel(content: string): MarkdownModel {
     frontmatter: meta,
     headings,
     anchors,
+    anchorLocations,
     anchorAliases: (file.data.readerAnchorAliases || {}) as Record<
       string,
       string

@@ -1,4 +1,5 @@
 "use client";
+import type { HealthIssue } from "@/lib/health";
 import { resolveDocumentLink } from "@/lib/references";
 import {
   lazy,
@@ -65,9 +66,9 @@ import {
 import { readLocalFiles, isolateImport } from "@/lib/import";
 import { storage } from "@/lib/storage";
 import {
-  analyze,
   documentTags,
   download,
+  downloadLocalAsset,
   fileName,
   headings,
   newDocument,
@@ -76,6 +77,8 @@ import {
   supportedFile,
 } from "@/lib/documents";
 import type { ReaderDocument, ReaderTheme } from "@/lib/types";
+const Insights = lazy(() => import("./insights"));
+const DocumentProperties = lazy(() => import("./document-properties"));
 const Editor = lazy(() => import("./editor"));
 type DialogName =
   | "search"
@@ -85,6 +88,8 @@ type DialogName =
   | "export"
   | "tags"
   | "analyze"
+  | "health"
+  | "properties"
   | "help"
   | "workspaces"
   | "history"
@@ -164,6 +169,11 @@ export default function Workspace() {
   const [findOpen, setFindOpen] = useState(false);
   const [find, setFind] = useState("");
   const [history, setHistory] = useState<string[]>([]);
+  const [sourceLocation, setSourceLocation] = useState<{
+    line: number;
+    token: number;
+  } | null>(null);
+  const assetPaths = useMemo(() => Object.keys(assetURLs), [assetURLs]);
   const [formValue, setFormValue] = useState("");
   const [leftWidth, setLeftWidth] = useState(264);
   const [rightWidth, setRightWidth] = useState(260);
@@ -221,12 +231,26 @@ export default function Workspace() {
   const openDocument = useCallback(
     (id: string) => {
       flushEdit();
+      setSourceLocation(null);
       if (activeId !== id) setHistory((h) => [...h, activeId].slice(-40));
       open(id);
       if (window.innerWidth < 900) setLeftOpen(false);
     },
     [activeId, open, flushEdit],
   );
+  const openFinding = (issue: HealthIssue) => {
+    if (!documents.some((d) => d.id === issue.documentId)) {
+      notify("That document is no longer in this workspace view.");
+      return;
+    }
+    openDocument(issue.documentId);
+    setMode("split");
+    setSourceLocation((current) => ({
+      line: issue.line,
+      token: (current?.token || 0) + 1,
+    }));
+    setDialog(null);
+  };
   const update = useCallback(
     (patch: Partial<ReaderDocument>, debounce = false) => {
       if (!doc) return;
@@ -301,6 +325,10 @@ export default function Workspace() {
       try {
         const result = resolveDocumentLink(doc, href, documents);
         const target = result.target;
+        if (!target && assetURLs[result.path]) {
+          downloadLocalAsset(result.path, assetURLs[result.path]);
+          return;
+        }
         if (!target) {
           notify(
             result.error === "ambiguous"
@@ -322,7 +350,7 @@ export default function Workspace() {
         notify("This document link is not valid.");
       }
     },
-    [doc, documents, activeId, openDocument, notify],
+    [doc, documents, activeId, openDocument, notify, assetURLs],
   );
   async function importFiles(files: File[]) {
     flushEdit();
@@ -616,7 +644,16 @@ export default function Workspace() {
               </IconButton>
             </div>
             <div className="workspace-label">
-              <span>WORKSPACE</span>
+              <button
+                title="Workspace health"
+                aria-label="Workspace health"
+                onClick={async () => {
+                  await flushEdit();
+                  setDialog("health");
+                }}
+              >
+                WORKSPACE <ShieldCheck size={11} />
+              </button>
               <div>
                 <IconButton
                   label="Open folder"
@@ -917,6 +954,7 @@ export default function Workspace() {
                 <Editor
                   key={doc.id}
                   dark={dark}
+                  location={sourceLocation}
                   value={doc.content}
                   onChange={(content) => update({ content }, true)}
                 />
@@ -1257,7 +1295,15 @@ export default function Workspace() {
                 </div>
               )}
               <section className="details-section">
-                <h2>Document Info</h2>
+                <div className="section-heading">
+                  <h2>Document Info</h2>
+                  <IconButton
+                    label="Document properties"
+                    onClick={() => setDialog("properties")}
+                  >
+                    <Info size={14} />
+                  </IconButton>
+                </div>
                 <dl>
                   <div>
                     <dt>
@@ -1944,51 +1990,45 @@ export default function Workspace() {
           </div>
         </Modal>
       )}
-      {dialog === "analyze" && doc && (
-        <Modal title="A closer look" onClose={() => setDialog(null)}>
-          <p className="dialog-description">
-            A local, rule-based check of headings, local links, and image
-            descriptions. External links are not checked.
-          </p>
-          <div className="analysis-stats">
-            <span>
-              <strong>{metadata.words}</strong>words
-            </span>
-            <span>
-              <strong>{metadata.headings}</strong>headings
-            </span>
-            <span>
-              <strong>
-                {metadata.completed}/{metadata.tasks}
-              </strong>
-              tasks done
-            </span>
-          </div>
-          <div className="analysis-issues">
-            {analyze(doc, documents).length ? (
-              analyze(doc, documents).map((issue, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    if (issue.heading) {
-                      setDialog(null);
-                      jump(issue.heading);
-                    }
-                  }}
-                >
-                  <Info size={16} />
-                  {issue.message}
-                </button>
-              ))
-            ) : (
-              <div className="analysis-good">
-                <CheckCheck size={26} />
-                <strong>Looking good.</strong>
-                <p>No issues found in these checks.</p>
-              </div>
-            )}
-          </div>
-        </Modal>
+      {(dialog === "health" || dialog === "analyze") && (
+        <Suspense
+          fallback={
+            <div className="workspace-loading" role="status">
+              Loading local checks…
+            </div>
+          }
+        >
+          <Insights
+            key={`${workspaceId}:${dialog === "analyze" ? activeId : "all"}`}
+            documents={documents}
+            assetPaths={assetPaths}
+            documentId={dialog === "analyze" ? activeId : undefined}
+            onOpenIssue={openFinding}
+            onClose={() => setDialog(null)}
+          />
+        </Suspense>
+      )}
+      {dialog === "properties" && doc && (
+        <Suspense
+          fallback={
+            <div className="workspace-loading" role="status">
+              Loading document properties…
+            </div>
+          }
+        >
+          <DocumentProperties
+            document={doc}
+            onClose={() => setDialog(null)}
+            onEdit={() => {
+              setDialog(null);
+              setMode("split");
+              setSourceLocation((current) => ({
+                line: 1,
+                token: (current?.token || 0) + 1,
+              }));
+            }}
+          />
+        </Suspense>
       )}
       {switching && (
         <div className="workspace-loading" role="status">

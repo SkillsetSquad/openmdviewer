@@ -153,3 +153,13 @@ it("builds deduplicated cross-document edges and updates them incrementally", ()
   );
   expect(search.navigation().edges).toEqual([]);
 });
+
+it("keeps wiki source lines accurate and leaves escaped wiki brackets literal", () => {
+  const model = markdownModel(
+    "# A\n\nPrefix line\n[[Missing]]\n\n\\[[Literal]]",
+  );
+  expect(
+    model.rawLinks.find((link) => link.href.startsWith("wiki:"))?.line,
+  ).toBe(4);
+  expect(model.links.some((link) => link.href.includes("Literal"))).toBe(false);
+});

@@ -39,6 +39,14 @@ export function newDocument(path: string, content: string): ReaderDocument {
     scroll: 0,
   };
 }
+export function downloadLocalAsset(name: string, url: string) {
+  if (!url.startsWith("blob:"))
+    throw new Error("Only imported local assets can be downloaded here.");
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName(name);
+  anchor.click();
+}
 export function download(
   name: string,
   content: BlobPart,

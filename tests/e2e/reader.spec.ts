@@ -772,3 +772,124 @@ test("preserves footnote navigation and prefixes imported heading and HTML IDs",
   await page.getByRole("link", { name: "Custom anchor", exact: true }).click();
   await expect(page.locator("#user-content-location")).toBeInViewport();
 });
+
+test("runs transparent local health checks, exports findings, and opens the affected source line", async ({
+  page,
+}) => {
+  let externalRequests = 0;
+  await page.route("https://example.com/**", (route) => {
+    externalRequests++;
+    return route.abort();
+  });
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Health.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(
+        "---\nowner: Morgan\nlast_reviewed: 2000-01-01\ncustom: {retention: 30}\n---\n# Health fixture\n\n#### Skipped\n\n[Missing](Missing.md)\n\n[External](https://example.com/private)",
+      ),
+    });
+  await page
+    .getByRole("button", { name: "Analyze document", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Document health" })
+      .getByRole("button", {
+        name: /Missing local document or attachment: Imported\/Missing.md/,
+      }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Scoring rules", exact: true }).click();
+  await expect(
+    page.getByText("These are deterministic checks, not AI judgments.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  const event = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export JSON", exact: true }).click();
+  const file = await event;
+  const stream = await file.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const part of stream!) chunks.push(Buffer.from(part));
+  const report = JSON.parse(Buffer.concat(chunks).toString());
+  expect(report.scope).toBe("document");
+  expect(report.documents).toHaveLength(1);
+  expect(report.documents[0].score).toBe(
+    Math.max(
+      0,
+      100 -
+        report.documents[0].issues.reduce(
+          (n: number, i: { penalty: number }) => n + i.penalty,
+          0,
+        ),
+    ),
+  );
+  expect(externalRequests).toBe(0);
+  await page.getByRole("tab", { name: "Findings", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: /Missing local document or attachment: Imported\/Missing.md/,
+    })
+    .click();
+  await expect(page.locator(".cm-activeLine")).toHaveText(
+    "[Missing](Missing.md)",
+  );
+  await page
+    .getByRole("button", { name: "Document properties", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Document properties" }),
+  ).toContainText("Morgan");
+  await expect(page.locator(".metadata-fields")).toContainText("retention");
+});
+
+test("opens whole-workspace health and downloads imported attachments locally", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles([
+      {
+        name: "Attachment.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Attachments\n\n[Download PDF](guide.pdf)"),
+      },
+      {
+        name: "guide.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("%PDF-1.0\nlocal fixture"),
+      },
+    ]);
+  const event = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Download PDF", exact: true }).click();
+  expect((await event).suggestedFilename()).toBe("guide.pdf");
+  await page
+    .getByRole("button", { name: "Workspace health", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Workspace health" })
+      .getByText("Rule-based health"),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Documents", exact: true }).click();
+  await expect(page.locator(".health-documents")).toContainText(
+    "Imported/Attachment.md",
+  );
+  const result = await new AxeBuilder({ page }).analyze();
+  expect(
+    result.violations
+      .filter((v) => v.impact === "serious" || v.impact === "critical")
+      .map((v) => v.id),
+  ).toEqual([]);
+});
