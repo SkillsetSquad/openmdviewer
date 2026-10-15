@@ -13,6 +13,14 @@ import { InteractiveTable } from "./interactive-table";
 import { CodeBlock } from "./code-block";
 import { resolvePath } from "@/lib/documents";
 import { Modal } from "./modal";
+import { frontmatter } from "@/lib/frontmatter";
+import {
+  markdownSchema,
+  remarkReaderExtensions,
+  rehypeRememberAnchors,
+  rehypeRepairAnchors,
+  rehypeHeadingAliases,
+} from "@/lib/markdown-pipeline";
 import { basePath } from "@/lib/types";
 const Diagram = lazy(() => import("./diagram"));
 
@@ -90,16 +98,7 @@ export function Markdown({
   assetURLs?: Record<string, string>;
   sourcePath?: string;
 }) {
-  const normalized = useMemo(
-    () =>
-      content
-        .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "")
-        .replace(
-          /> \[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO|SUCCESS|ERROR)\]\n/gi,
-          "> **$1**\n>\n",
-        ),
-    [content],
-  );
+  const parsed = useMemo(() => frontmatter(content), [content]);
   const components: Components = {
     input: ({ checked, type }) => (
       <input
@@ -127,12 +126,12 @@ export function Markdown({
       <a
         href={href}
         onClick={(e) => {
-          if (href && !/^https?:|^mailto:/i.test(href)) {
+          if (href && !/^https?:|^mailto:|^tel:|^\/\//i.test(href)) {
             e.preventDefault();
             onLink(href);
           }
         }}
-        target={/^https?:/i.test(href || "") ? "_blank" : undefined}
+        target={/^(?:https?:|\/\/)/i.test(href || "") ? "_blank" : undefined}
         rel="noopener noreferrer"
       >
         {children}
@@ -147,63 +146,54 @@ export function Markdown({
       }
       return <SafeImage key={resolved} src={resolved} alt={alt} />;
     },
-    blockquote: ({ children }) => {
-      const text = JSON.stringify(children);
-      const tip = text.includes("TIP") || text.includes("SUCCESS");
-      const warning =
-        text.includes("WARNING") ||
-        text.includes("CAUTION") ||
-        text.includes("ERROR");
-      const note =
-        text.includes("NOTE") ||
-        text.includes("IMPORTANT") ||
-        text.includes("INFO");
+    blockquote: ({ children, node }) => {
+      const type = String(node?.properties.dataCallout || "");
+      const tip = ["tip", "success"].includes(type);
+      const warning = ["warning", "caution", "error"].includes(type);
       const Icon = tip ? Lightbulb : warning ? ShieldAlert : Info;
       return (
         <blockquote
           className={
-            tip
-              ? "callout tip"
-              : warning
-                ? "callout warning"
-                : note
-                  ? "callout note"
-                  : "quote"
+            type
+              ? `callout ${tip ? "tip" : warning ? "warning" : "note"}`
+              : "quote"
           }
         >
-          {(tip || note || warning) && (
-            <Icon className="callout-icon" size={20} />
-          )}
-          <div>{children}</div>
+          {type && <Icon className="callout-icon" size={20} />}
+          <div>
+            {type && <p className="callout-label">{type.toUpperCase()}</p>}
+            {children}
+          </div>
         </blockquote>
       );
     },
     table: ({ children }) => <InteractiveTable>{children}</InteractiveTable>,
   };
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[
-        rehypeRaw,
-        [
-          rehypeSanitize,
-          {
-            /* default schema, plus a harmless local asset protocol */ protocols:
-              {
-                href: ["http", "https", "mailto"],
-                src: ["http", "https", "asset", "blob"],
-              },
-          },
-        ],
-        rehypeSlug,
-        [rehypeKatex, { strict: "warn", trust: false }],
-      ]}
-      components={components}
-      urlTransform={(url) =>
-        /^(?:javascript|vbscript|data):/i.test(url.trim()) ? "" : url
-      }
-    >
-      {normalized}
-    </ReactMarkdown>
+    <>
+      {parsed.error && (
+        <p className="frontmatter-error" role="alert">
+          Frontmatter could not be parsed: {parsed.error}
+        </p>
+      )}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath, remarkReaderExtensions]}
+        rehypePlugins={[
+          rehypeRaw,
+          rehypeRememberAnchors,
+          [rehypeSanitize, markdownSchema],
+          rehypeRepairAnchors,
+          [rehypeSlug, { prefix: "user-content-" }],
+          rehypeHeadingAliases,
+          [rehypeKatex, { strict: "warn", trust: false }],
+        ]}
+        components={components}
+        urlTransform={(url) =>
+          /^(?:javascript|vbscript|data):/i.test(url.trim()) ? "" : url
+        }
+      >
+        {parsed.body}
+      </ReactMarkdown>
+    </>
   );
 }

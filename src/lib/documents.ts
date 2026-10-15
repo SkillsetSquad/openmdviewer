@@ -1,35 +1,31 @@
-import GithubSlugger from "github-slugger";
+import { markdownModel } from "./markdown-model";
+import { metadataString, metadataTags } from "./frontmatter";
 import type { Heading, ReaderDocument } from "./types";
 
 export const supportedFile = (name: string) =>
   /\.(md|markdown|mdown|mkd|mdx|txt)$/i.test(name);
-export const fileName = (path: string) => path.split("/").pop() || path;
+import { fileName, safePath } from "./paths";
+export { fileName, safePath, resolvePath } from "./paths";
+import { resolveDocumentLink } from "./references";
 export const documentTitle = (doc: ReaderDocument) =>
-  doc.content.match(/^#\s+(.+)$/m)?.[1] ||
+  metadataString(markdownModel(doc.content).frontmatter.metadata, "title") ||
+  markdownModel(doc.content).headings.find((h) => h.depth === 1)?.text ||
   fileName(doc.path).replace(/\.[^.]+$/, "");
+export const documentTags = (doc: ReaderDocument) => [
+  ...new Set([
+    ...doc.tags,
+    ...metadataTags(markdownModel(doc.content).frontmatter.metadata),
+  ]),
+];
 export function headings(content: string): Heading[] {
-  const slugger = new GithubSlugger();
-  const clean = content.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$/gm, "");
-  return [...clean.matchAll(/^(#{1,6})\s+(.+?)\s*#*\s*$/gm)].map((m) => ({
-    id: slugger.slug(m[2]),
-    text: m[2],
-    depth: m[1].length,
+  return markdownModel(content).headings.map(({ id, text, depth }) => ({
+    id,
+    text,
+    depth,
   }));
 }
 export function stats(content: string) {
-  const words = content.trim() ? content.trim().split(/\s+/u).length : 0;
-  const tasks = [...content.matchAll(/^\s*[-*]\s+\[([ xX])\]/gm)];
-  return {
-    words,
-    characters: content.length,
-    minutes: Math.max(1, Math.ceil(words / 220)),
-    headings: headings(content).length,
-    codeBlocks: [...content.matchAll(/^```/gm)].length / 2,
-    images: [...content.matchAll(/!\[[^\]]*\]\([^)]+\)/g)].length,
-    links: [...content.matchAll(/(?<!!)\[[^\]]+\]\([^)]+\)/g)].length,
-    tasks: tasks.length,
-    completed: tasks.filter((t) => t[1].toLowerCase() === "x").length,
-  };
+  return markdownModel(content).statistics;
 }
 export function newDocument(path: string, content: string): ReaderDocument {
   return {
@@ -42,23 +38,6 @@ export function newDocument(path: string, content: string): ReaderDocument {
     favorite: false,
     scroll: 0,
   };
-}
-export function safePath(path: string): string {
-  return (
-    path
-      .replace(/\\/g, "/")
-      .split("/")
-      .filter((s) => s && s !== "." && s !== "..")
-      .join("/") || "Untitled.md"
-  );
-}
-export function resolvePath(from: string, href: string) {
-  const stack = from.split("/").slice(0, -1);
-  for (const part of decodeURIComponent(href).split("/")) {
-    if (part === "..") stack.pop();
-    else if (part && part !== ".") stack.push(part);
-  }
-  return stack.join("/");
 }
 export function download(
   name: string,
@@ -92,17 +71,23 @@ export function analyze(doc: ReaderDocument, docs: ReaderDocument[]) {
       issues.push({ message: `Repeated heading: ${h.text}`, heading: h.id });
     seen.add(h.text.toLowerCase());
   });
-  for (const m of doc.content.matchAll(/(?<!!)\[[^\]]*\]\(([^)]+)\)/g)) {
-    if (/^(https?:|mailto:)/i.test(m[1])) continue;
-    const [path, anchor] = m[1].split("#");
-    const target = path
-      ? docs.find((d) => d.path === resolvePath(doc.path, path))
-      : doc;
-    if (!target) issues.push({ message: `Missing local document: ${path}` });
-    else if (anchor && !headings(target.content).some((h) => h.id === anchor))
-      issues.push({ message: `Missing heading: ${anchor}` });
+  for (const link of markdownModel(doc.content).links) {
+    if (link.image) {
+      if (!link.alt)
+        issues.push({ message: "Add descriptive alt text to images." });
+      continue;
+    }
+    const result = resolveDocumentLink(doc, link.href, docs);
+    if (result.external) continue;
+    if (!result.target)
+      issues.push({ message: `Missing local document: ${result.path}` });
+    else if (
+      result.anchor &&
+      !markdownModel(result.target.content).anchors.includes(
+        result.actualAnchor,
+      )
+    )
+      issues.push({ message: `Missing heading: ${result.anchor}` });
   }
-  if (/!\[\s*\]\(/.test(doc.content))
-    issues.push({ message: "Add descriptive alt text to images." });
   return issues;
 }

@@ -5,6 +5,7 @@ await build({
   bundle: true,
   minify: true,
   platform: "browser",
+  conditions: ["worker"],
   target: "es2020",
   format: "iife",
 });

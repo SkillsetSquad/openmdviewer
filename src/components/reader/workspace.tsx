@@ -1,4 +1,5 @@
 "use client";
+import { resolveDocumentLink, documentBacklinks } from "@/lib/references";
 import {
   lazy,
   Suspense,
@@ -66,11 +67,11 @@ import { storage } from "@/lib/storage";
 import {
   analyze,
   documentTitle,
+  documentTags,
   download,
   fileName,
   headings,
   newDocument,
-  resolvePath,
   safePath,
   stats,
   supportedFile,
@@ -172,6 +173,7 @@ export default function Workspace() {
   const filesRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const doc = documents.find((d) => d.id === activeId);
+  const effectiveTags = useMemo(() => (doc ? documentTags(doc) : []), [doc]);
   const outline = useMemo(() => headings(doc?.content || ""), [doc?.content]);
   const metadata = useMemo(() => stats(doc?.content || ""), [doc?.content]);
   const dark =
@@ -298,20 +300,22 @@ export default function Workspace() {
     (href: string) => {
       if (!doc) return;
       try {
-        const [path, anchor] = href.split("#");
-        const target = path
-          ? documents.find((d) => d.path === resolvePath(doc.path, path))
-          : doc;
+        const result = resolveDocumentLink(doc, href, documents);
+        const target = result.target;
         if (!target) {
-          notify(`Document not in this workspace: ${path}`);
+          notify(
+            result.error === "ambiguous"
+              ? `Several documents match this wiki link: ${result.path}`
+              : `Document not in this workspace: ${result.path}`,
+          );
           return;
         }
         if (target.id !== activeId) openDocument(target.id);
-        if (anchor)
+        if (result.actualAnchor)
           setTimeout(
             () =>
               document
-                .getElementById(decodeURIComponent(anchor))
+                .getElementById(result.actualAnchor)
                 ?.scrollIntoView({ behavior: "smooth", block: "start" }),
             target.id === activeId ? 0 : 100,
           );
@@ -434,7 +438,7 @@ export default function Workspace() {
           (d) =>
             (collection !== "favorites" || d.favorite) &&
             (!fileFilter ||
-              `${d.path} ${d.tags.join(" ")}`
+              `${d.path} ${documentTags(d).join(" ")}`
                 .toLowerCase()
                 .includes(fileFilter.toLowerCase())),
         )
@@ -443,50 +447,24 @@ export default function Workspace() {
         ),
     [documents, collection, fileFilter],
   );
-  const searchIds = useLocalSearch(documents, query);
-  const results = useMemo(() => {
-    if (searchIds)
-      return searchIds
-        .map((id) => documents.find((d) => d.id === id))
-        .filter((d): d is ReaderDocument => !!d);
-    const tokens = query.toLowerCase().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-    return documents
-      .filter((d) =>
-        tokens.every((token) => {
-          const [filter, ...rest] = token.split(":");
-          const value = rest.join(":");
-          if (filter === "tag" && value)
-            return d.tags.some((t) => t.toLowerCase().includes(value));
-          if (filter === "path" && value)
-            return d.path.toLowerCase().includes(value);
-          if (filter === "heading" && value)
-            return headings(d.content).some((h) =>
-              h.text.toLowerCase().includes(value),
-            );
-          return `${d.path}\n${d.content}`
-            .toLowerCase()
-            .includes(token.replace(/^"|"$/g, ""));
-        }),
-      )
-      .slice(0, 40);
-  }, [documents, query, searchIds]);
-  const backlinks = useMemo(
+  const { ids: searchIds, failed: searchFailed } = useLocalSearch(
+    documents,
+    query,
+  );
+  const searching = !!query.trim() && searchIds === null && !searchFailed;
+  const results = useMemo(
     () =>
-      doc
-        ? documents.filter(
-            (d) =>
-              d.id !== doc.id &&
-              [
-                ...d.content.matchAll(/\[[^\]]*\]\(([^)#]+)(?:#[^)]*)?\)/g),
-              ].some((m) => {
-                try {
-                  return resolvePath(d.path, m[1]) === doc.path;
-                } catch {
-                  return false;
-                }
-              }),
-          )
-        : [],
+      searchIds
+        ? searchIds
+            .map((id) => documents.find((d) => d.id === id))
+            .filter((d): d is ReaderDocument => !!d)
+        : query.trim()
+          ? []
+          : documents.slice(0, 40),
+    [documents, query, searchIds],
+  );
+  const backlinks = useMemo(
+    () => (doc ? documentBacklinks(doc, documents) : []),
     [doc, documents],
   );
   function resize(side: "left" | "right", e: React.PointerEvent) {
@@ -965,7 +943,7 @@ export default function Workspace() {
                   <div className="document-eyebrow">
                     <span className="guide-badge">
                       <BookOpen size={12} />
-                      {doc.tags[0] || "Document"}
+                      {effectiveTags[0] || "Document"}
                     </span>
                     <span>
                       <Clock3 size={12} />
@@ -1321,7 +1299,7 @@ export default function Workspace() {
                   </IconButton>
                 </div>
                 <div className="tag-list">
-                  {doc?.tags.map((tag) => (
+                  {effectiveTags.map((tag) => (
                     <button
                       key={tag}
                       onClick={() => {
@@ -1332,7 +1310,7 @@ export default function Workspace() {
                       {tag}
                     </button>
                   ))}
-                  {!doc?.tags.length && (
+                  {!effectiveTags.length && (
                     <span className="muted">No tags yet</span>
                   )}
                 </div>
@@ -1639,7 +1617,18 @@ export default function Workspace() {
                 <ChevronRight size={14} />
               </button>
             ))}
-            {query && !results.length && (
+            {searching && (
+              <p className="empty-panel" role="status">
+                Searching on this device…
+              </p>
+            )}
+            {searchFailed && (
+              <p className="empty-panel" role="alert">
+                The local search worker could not finish. Reload the app to
+                rebuild the index.
+              </p>
+            )}
+            {query && !results.length && !searching && !searchFailed && (
               <div className="empty-panel">
                 No matches. Try a different phrase, path:docs, or tag:guide.
               </div>
@@ -1825,6 +1814,12 @@ export default function Workspace() {
                 }
               />
             </label>
+            {dialog === "tags" && (
+              <p className="dialog-description">
+                These tags are stored locally. Frontmatter tags also appear in
+                the reader; edit those in source view.
+              </p>
+            )}
             {dialog !== "tags" && (
               <p className="dialog-description">
                 Use / to organize into folders. Changes are saved in this

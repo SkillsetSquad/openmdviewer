@@ -2416,3 +2416,4 @@ kbd {
   color: var(--accent-blue);
   font-weight: 550;
 }
+.frontmatter-error { border: 1px solid #e9b26766; border-radius: 6px; background: #50361e44; color: var(--foreground); padding: 12px; font-size: 12px; margin-bottom: 18px; }

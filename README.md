@@ -25,10 +25,10 @@ The `out/` directory is the entire application. No application server, accounts,
 ## Available now
 
 - Responsive dark reader inspired by the supplied design: collapsible file tree, breadcrumbs, document tabs, reading toolbar, contents, properties, tags, actions, backlinks, and a local connection graph.
-- CommonMark/GFM, sortable/filterable tables with CSV copy/export, task lists, footnotes, sanitized HTML, KaTeX, lazy Shiki highlighting with line numbers/copy/download/folding, strict Mermaid diagrams with zoom/source/SVG export.
+- CommonMark/GFM, YAML/TOML/JSON frontmatter, wiki/reference links, safe heading and footnote navigation, sortable/filterable tables with CSV copy/export, task lists, footnotes, sanitized HTML, KaTeX, lazy Shiki highlighting with line numbers/copy/download/folding, strict Mermaid diagrams with zoom/source/SVG export.
 - Local Markdown/text/MDX and media imports, folder selection, ZIP imports with size limits, duplicate-path protection, drag and drop, document creation and path renaming.
 - Named, isolated local workspaces with icons and descriptions; IndexedDB document persistence; local reading preferences; scroll restoration; favorites; tags; source/split editing with CodeMirror and debounced browser autosave, the previous 50 content revisions, restore/compare, recoverable trash, duplication, and stale-tab conflict detection.
-- Incremental worker-based fuzzy search with phrases and `tag:`, `path:`, `heading:` filters, in-document find, keyboard commands, focus and presentation reading, six theme choices, font and layout settings.
+- Incremental worker-based fuzzy search with phrases and `tag:`, `path:`, `heading:`, `status:`, and `type:` filters, in-document find, keyboard commands, focus and presentation reading, six theme choices, font and layout settings.
 - Markdown, sanitized HTML, ZIP workspace export with media, folders, tags, favorites, and document dates; browser print / Save as PDF; basic deterministic heading/link/alt-text analysis.
 - Static PWA with all application modules precached for offline use, bundled fonts/images, CSP, no telemetry or document uploads.
 

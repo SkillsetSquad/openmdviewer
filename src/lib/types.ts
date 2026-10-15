@@ -51,3 +51,11 @@ export interface DocumentSnapshot {
   createdAt: number;
   reason: "edit" | "restore" | "trash";
 }
+
+export interface SourceReference {
+  href: string;
+  text: string;
+  line: number;
+  image: boolean;
+  alt?: string;
+}

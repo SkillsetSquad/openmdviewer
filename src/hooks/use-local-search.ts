@@ -1,22 +1,29 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { documentTitle, headings } from "@/lib/documents";
 import { basePath } from "@/lib/types";
 import type { ReaderDocument } from "@/lib/types";
 export function useLocalSearch(documents: ReaderDocument[], query: string) {
   const worker = useRef<Worker | null>(null);
-  const versions = useRef(new Map<string, string>());
+  const versions = useRef(
+    new Map<string, { path: string; content: string; tags: string }>(),
+  );
   const sequence = useRef(0);
   const [result, setResult] = useState<{ query: string; ids: string[] } | null>(
     null,
   );
+  const [failed, setFailed] = useState(false);
   const currentQuery = useRef(query);
   useEffect(() => {
     const instance = new Worker(`${basePath}/search-worker.js`);
     worker.current = instance;
     const versionMap = versions.current;
+    instance.onerror = () => setFailed(true);
     instance.onmessage = (event) => {
-      if (!event.data.error && event.data.request === sequence.current)
+      if (event.data.error) {
+        setFailed(true);
+        return;
+      }
+      if (event.data.request === sequence.current)
         setResult({ query: currentQuery.current, ids: event.data.ids });
     };
     return () => {
@@ -31,26 +38,22 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
       (id) => !existing.has(id),
     );
     const changes = documents
-      .filter(
-        (d) =>
-          versions.current.get(d.id) !==
-          JSON.stringify([d.path, d.updatedAt, d.tags]),
-      )
-      .map((d) => {
-        versions.current.set(
-          d.id,
-          JSON.stringify([d.path, d.updatedAt, d.tags]),
+      .filter((d) => {
+        const old = versions.current.get(d.id);
+        return (
+          !old ||
+          old.content !== d.content ||
+          old.path !== d.path ||
+          old.tags !== JSON.stringify(d.tags)
         );
-        return {
-          id: d.id,
+      })
+      .map((d) => {
+        versions.current.set(d.id, {
           path: d.path,
           content: d.content,
-          tags: d.tags,
-          title: documentTitle(d),
-          headings: headings(d.content)
-            .map((h) => h.text)
-            .join("\n"),
-        };
+          tags: JSON.stringify(d.tags),
+        });
+        return { id: d.id, path: d.path, content: d.content, tags: d.tags };
       });
     removed.forEach((id) => versions.current.delete(id));
     if (changes.length || removed.length)
@@ -62,5 +65,5 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
       request: ++sequence.current,
     });
   }, [documents, query]);
-  return result?.query === query ? result.ids : null;
+  return { ids: result?.query === query ? result.ids : null, failed };
 }

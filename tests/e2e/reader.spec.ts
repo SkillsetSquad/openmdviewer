@@ -679,3 +679,96 @@ test("finishes a slow import in its original workspace after switching projects"
     page.getByRole("heading", { name: "Imported into the original project" }),
   ).toBeVisible();
 });
+
+test("uses frontmatter metadata in local search and navigates wiki and reference links", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles([
+      {
+        name: "A.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from(
+          "---\ntitle: Operations manual\nstatus: approved\nowner: Morgan\ntags: [operations]\n---\n# Start here\n\n[[B#destination|Wiki destination]]\n\n[Reference destination][target]\n\n[target]: B.md#destination",
+        ),
+      },
+      {
+        name: "B.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# B\n\n## Destination\n\nA linked document."),
+      },
+    ]);
+  await expect(
+    page.getByRole("heading", { name: "Start here", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "operations", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Wiki destination", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Destination", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Backlinks", exact: false }).click();
+  await expect(
+    page.locator(".backlinks-panel").getByRole("button", { name: /A.md/ }),
+  ).toBeVisible();
+  await page.keyboard.press("Control+k");
+  await page
+    .getByRole("textbox", { name: "Search documents and commands" })
+    .fill("status:approved tag:operations Morgan");
+  await page
+    .getByRole("button", { name: /Operations manual Imported/ })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Start here", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Reference destination", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Destination", exact: true }),
+  ).toBeVisible();
+});
+
+test("preserves footnote navigation and prefixes imported heading and HTML IDs", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Anchors.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(
+        "# constructor\n\nText with a footnote.[^one]\n\n" +
+          "A paragraph for scrolling.\n\n".repeat(35) +
+          '[^one]: Footnote content.\n\n<p id="location">A safe custom anchor.</p>\n\n[Custom anchor](#location)',
+      ),
+    });
+  await expect(
+    page.getByRole("heading", { name: "constructor", exact: true }),
+  ).toHaveAttribute("id", "user-content-constructor");
+  expect(
+    await page.evaluate(
+      () =>
+        document.getElementById("constructor") === null &&
+        window.location instanceof Location,
+    ),
+  ).toBe(true);
+  await page.locator("sup a").click();
+  await expect(page.locator("section[data-footnotes] li")).toBeInViewport();
+  await page.getByRole("link", { name: "Custom anchor", exact: true }).click();
+  await expect(page.locator("#user-content-location")).toBeInViewport();
+});

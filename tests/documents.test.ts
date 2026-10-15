@@ -28,9 +28,9 @@ describe("local document utilities", () => {
         "# Title\n\n## Hello world\n## Hello world\n```md\n## Not a heading\n```",
       ),
     ).toEqual([
-      { id: "title", text: "Title", depth: 1 },
-      { id: "hello-world", text: "Hello world", depth: 2 },
-      { id: "hello-world-1", text: "Hello world", depth: 2 },
+      { id: "user-content-title", text: "Title", depth: 1 },
+      { id: "user-content-hello-world", text: "Hello world", depth: 2 },
+      { id: "user-content-hello-world-1", text: "Hello world", depth: 2 },
     ]);
   });
   it("counts real content and task completion", () => {
