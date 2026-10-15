@@ -1,6 +1,5 @@
-/* eslint-disable @next/next/no-img-element -- Local and explicitly consented media use native elements without a proxy. */
 "use client";
-import { lazy, memo, Suspense, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -11,8 +10,6 @@ import rehypeKatex from "rehype-katex";
 import { Info, Lightbulb, ShieldAlert } from "lucide-react";
 import { InteractiveTable } from "./interactive-table";
 import { CodeBlock } from "./code-block";
-import { resolvePath } from "@/lib/documents";
-import { Modal } from "./modal";
 import { frontmatter } from "@/lib/frontmatter";
 import {
   markdownSchema,
@@ -21,71 +18,8 @@ import {
   rehypeRepairAnchors,
   rehypeHeadingAliases,
 } from "@/lib/markdown-pipeline";
-import { basePath } from "@/lib/types";
+import { ImageGallery, ImageRenderer } from "./image-gallery";
 const Diagram = lazy(() => import("./diagram"));
-
-function SafeImage({ src, alt }: { src?: string; alt?: string }) {
-  const [allowed, setAllowed] = useState(false);
-  const [zoom, setZoom] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const bundled = src === "asset:alpine-lake";
-  const local = bundled || /^blob:/.test(src || "");
-  const safe =
-    src && (/^https?:\/\//i.test(src) || local || /^blob:/.test(src));
-  if (!safe)
-    return (
-      <span className="blocked-media">
-        Local image unavailable: {alt || src}. Import the image with your
-        Markdown folder or ZIP.
-      </span>
-    );
-  if (!local && !allowed)
-    return (
-      <span className="blocked-media">
-        <span>Remote image blocked · {alt || "Image"}</span>
-        <button onClick={() => setAllowed(true)}>Load this image</button>
-      </span>
-    );
-  const url = bundled ? `${basePath}/images/alpine-lake.jpg` : src;
-  if (failed)
-    return (
-      <span className="blocked-media">Image unavailable: {alt || src}</span>
-    );
-  // Imported media is intentionally rendered with native elements; no image proxy or external optimizer.
-  return (
-    <>
-      <img
-        className="document-image"
-        src={url}
-        alt={alt || ""}
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
-        onClick={() => setZoom(true)}
-        tabIndex={0}
-        role="button"
-        aria-label={`Enlarge image: ${alt || "image"}`}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setZoom(true);
-          }
-        }}
-      />
-      {zoom && (
-        <Modal
-          title={alt || "Image preview"}
-          onClose={() => setZoom(false)}
-          wide
-        >
-          <div className="zoomed-image">
-            <img src={url} alt={alt || ""} />
-          </div>
-        </Modal>
-      )}
-    </>
-  );
-}
 
 // A stable component type preserves table state when document props update.
 const TableRenderer: Components["table"] = ({ children }) => (
@@ -97,11 +31,13 @@ export const Markdown = memo(function Markdown({
   onLink,
   assetURLs = {},
   sourcePath = "",
+  galleryContent = content,
 }: {
   content: string;
   onLink: (href: string) => void;
   assetURLs?: Record<string, string>;
   sourcePath?: string;
+  galleryContent?: string;
 }) {
   const parsed = useMemo(() => frontmatter(content), [content]);
   const components: Components = {
@@ -142,15 +78,7 @@ export const Markdown = memo(function Markdown({
         {children}
       </a>
     ),
-    img: ({ src, alt }) => {
-      let resolved = typeof src === "string" ? src : undefined;
-      if (resolved && !/^(https?:|blob:|asset:)/i.test(resolved)) {
-        try {
-          resolved = assetURLs[resolvePath(sourcePath, resolved)] || resolved;
-        } catch {}
-      }
-      return <SafeImage key={resolved} src={resolved} alt={alt} />;
-    },
+    img: ImageRenderer,
     blockquote: ({ children, node }) => {
       const type = String(node?.properties.dataCallout || "");
       const tip = ["tip", "success"].includes(type);
@@ -175,7 +103,11 @@ export const Markdown = memo(function Markdown({
     table: TableRenderer,
   };
   return (
-    <>
+    <ImageGallery
+      content={galleryContent}
+      sourcePath={sourcePath}
+      assets={assetURLs}
+    >
       {parsed.error && (
         <p className="frontmatter-error" role="alert">
           Frontmatter could not be parsed: {parsed.error}
@@ -199,6 +131,6 @@ export const Markdown = memo(function Markdown({
       >
         {parsed.body}
       </ReactMarkdown>
-    </>
+    </ImageGallery>
   );
 });

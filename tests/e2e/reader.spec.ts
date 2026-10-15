@@ -169,6 +169,17 @@ test("starts offline and opens lazy rendering modules from the application cache
   await expect(
     page.getByRole("heading", { name: "Configuration Guide", exact: true }),
   ).toBeVisible();
+  await page.locator(".document-image").first().click();
+  const imageViewer = page.getByRole("dialog");
+  await expect(
+    imageViewer
+      .getByRole("group", { name: "Image canvas", exact: true })
+      .locator("img"),
+  ).toBeVisible();
+  await expect(imageViewer).toContainText("image/jpeg");
+  await imageViewer
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
   await page.keyboard.press("Control+k");
   await page
     .getByRole("combobox", { name: "Search documents and commands" })

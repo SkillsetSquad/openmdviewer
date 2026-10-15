@@ -1186,6 +1186,7 @@ export default function Workspace() {
                       <>
                         <div className="configuration-left">
                           <Markdown
+                            galleryContent={doc.content}
                             key={doc.id}
                             content={doc.content.slice(
                               0,
@@ -1198,6 +1199,7 @@ export default function Workspace() {
                         </div>
                         <div className="configuration-right">
                           <Markdown
+                            galleryContent={doc.content}
                             key={doc.id}
                             content={doc.content.slice(
                               doc.content.indexOf("![A still alpine lake"),
@@ -1210,6 +1212,7 @@ export default function Workspace() {
                       </>
                     ) : (
                       <Markdown
+                        galleryContent={doc.content}
                         key={doc.id}
                         content={doc.content}
                         onLink={navigateLink}

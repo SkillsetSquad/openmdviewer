@@ -2,7 +2,7 @@
 
 **Your words. Your space.** A free, open-source Markdown reader and local knowledge workspace by SkillsetSquad. A compact, three-pane interface with a file tree, a focused reading surface, and contextual document navigation.
 
-[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Tables](docs/TABLES.md) · [Contributor instructions](AGENTS.md)
+[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Tables](docs/TABLES.md) · [Images](docs/IMAGES.md) · [Contributor instructions](AGENTS.md)
 
 ## Run locally
 
@@ -26,6 +26,7 @@ The `out/` directory is the entire application. No application server, accounts,
 
 - Responsive dark reader inspired by the supplied design: collapsible file tree, breadcrumbs, document tabs, reading toolbar, contents, properties, tags, actions, backlinks, and an interactive workspace graph with search, tag/connection filters, neighborhood exploration, zoom/pan, and an accessible document list.
 - CommonMark/GFM, YAML/TOML/JSON frontmatter, wiki/reference links, safe heading and footnote navigation, sortable tables with whole-table and column filters, cell/row copying, CSV/JSON export, resizing, pagination, numeric summaries, and full-viewport viewing, task lists, footnotes, sanitized HTML, KaTeX, lazy Shiki highlighting with line numbers/copy/download/folding, strict Mermaid diagrams with zoom/source/SVG export.
+- Full-viewport image gallery with zoom/pan, keyboard navigation, local dimensions/type/byte size, original downloads, PNG clipboard copying, and individual remote-image consent.
 - Local Markdown/text/MDX and media imports, folder selection, ZIP imports with size limits, duplicate-path protection, drag and drop, document creation and path renaming.
 - Named, isolated local workspaces with icons and descriptions; IndexedDB document persistence; local reading preferences; scroll restoration; favorites; tags; source/split editing with CodeMirror and debounced browser autosave, the previous 50 content revisions, restore/compare, recoverable trash, duplication, and stale-tab conflict detection.
 - Incremental worker-based fuzzy search with phrases and `tag:`, `path:`, `heading:`, `status:`, and `type:` filters, in-document find, a fuzzy command palette with keyboard navigation and commands-only search, focus and presentation reading, six theme choices, font and layout settings.
