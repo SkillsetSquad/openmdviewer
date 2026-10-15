@@ -8,9 +8,11 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import rehypeKatex from "rehype-katex";
-import { Info, Lightbulb, ShieldAlert, X } from "lucide-react";
+import { Info, Lightbulb, ShieldAlert } from "lucide-react";
 import { InteractiveTable } from "./interactive-table";
 import { CodeBlock } from "./code-block";
+import { resolvePath } from "@/lib/documents";
+import { Modal } from "./modal";
 import { basePath } from "@/lib/types";
 const Diagram = lazy(() => import("./diagram"));
 
@@ -18,14 +20,15 @@ function SafeImage({ src, alt }: { src?: string; alt?: string }) {
   const [allowed, setAllowed] = useState(false);
   const [zoom, setZoom] = useState(false);
   const [failed, setFailed] = useState(false);
-  const local = src === "asset:alpine-lake";
+  const bundled = src === "asset:alpine-lake";
+  const local = bundled || /^blob:/.test(src || "");
   const safe =
     src && (/^https?:\/\//i.test(src) || local || /^blob:/.test(src));
   if (!safe)
     return (
       <span className="blocked-media">
-        Local image unavailable: {alt || src}. Import media support is tracked
-        in the roadmap.
+        Local image unavailable: {alt || src}. Import the image with your
+        Markdown folder or ZIP.
       </span>
     );
   if (!local && !allowed)
@@ -35,7 +38,7 @@ function SafeImage({ src, alt }: { src?: string; alt?: string }) {
         <button onClick={() => setAllowed(true)}>Load this image</button>
       </span>
     );
-  const url = local ? `${basePath}/images/alpine-lake.jpg` : src;
+  const url = bundled ? `${basePath}/images/alpine-lake.jpg` : src;
   if (failed)
     return (
       <span className="blocked-media">Image unavailable: {alt || src}</span>
@@ -55,28 +58,22 @@ function SafeImage({ src, alt }: { src?: string; alt?: string }) {
         role="button"
         aria-label={`Enlarge image: ${alt || "image"}`}
         onKeyDown={(e) => {
-          if (e.key === "Enter") setZoom(true);
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setZoom(true);
+          }
         }}
       />
       {zoom && (
-        <div
-          className="image-overlay"
-          role="dialog"
-          aria-label="Image preview"
-          aria-modal="true"
-          onClick={() => setZoom(false)}
+        <Modal
+          title={alt || "Image preview"}
+          onClose={() => setZoom(false)}
+          wide
         >
-          <button
-            autoFocus
-            aria-label="Close image preview"
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setZoom(false);
-            }}
-          >
-            <X />
-          </button>
-          <img src={url} alt={alt || ""} />
-        </div>
+          <div className="zoomed-image">
+            <img src={url} alt={alt || ""} />
+          </div>
+        </Modal>
       )}
     </>
   );
@@ -85,9 +82,13 @@ function SafeImage({ src, alt }: { src?: string; alt?: string }) {
 export function Markdown({
   content,
   onLink,
+  assetURLs = {},
+  sourcePath = "",
 }: {
   content: string;
   onLink: (href: string) => void;
+  assetURLs?: Record<string, string>;
+  sourcePath?: string;
 }) {
   const normalized = useMemo(
     () =>
@@ -137,9 +138,15 @@ export function Markdown({
         {children}
       </a>
     ),
-    img: ({ src, alt }) => (
-      <SafeImage src={typeof src === "string" ? src : undefined} alt={alt} />
-    ),
+    img: ({ src, alt }) => {
+      let resolved = typeof src === "string" ? src : undefined;
+      if (resolved && !/^(https?:|blob:|asset:)/i.test(resolved)) {
+        try {
+          resolved = assetURLs[resolvePath(sourcePath, resolved)] || resolved;
+        } catch {}
+      }
+      return <SafeImage key={resolved} src={resolved} alt={alt} />;
+    },
     blockquote: ({ children }) => {
       const text = JSON.stringify(children);
       const tip = text.includes("TIP") || text.includes("SUCCESS");

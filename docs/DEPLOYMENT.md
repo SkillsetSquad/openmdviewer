@@ -46,6 +46,8 @@ Build on a development machine or CI and copy the generated `out/` files to the 
 NEXT_PUBLIC_BASE_PATH=/reader npm run build
 ```
 
+To exercise the same browser suite under the project subpath, run `NEXT_PUBLIC_BASE_PATH=/openmdviewer npm run build` followed by `npm run test:subpath`. CI performs both root and subpath browser checks.
+
 Mount the **contents** of `out/` at `/reader/`, preserving `_next/` and all other asset paths. The generated manifest, icons, service worker scope, and cached asset URLs use this prefix. Use a leading slash and no trailing slash for the environment variable. For a subpath Docker image:
 
 ```sh

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { documentTitle, headings } from "@/lib/documents";
+import { basePath } from "@/lib/types";
 import type { ReaderDocument } from "@/lib/types";
 export function useLocalSearch(documents: ReaderDocument[], query: string) {
   const worker = useRef<Worker | null>(null);
@@ -11,9 +12,7 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
   );
   const currentQuery = useRef(query);
   useEffect(() => {
-    const instance = new Worker(
-      new URL("../workers/search.worker.ts", import.meta.url),
-    );
+    const instance = new Worker(`${basePath}/search-worker.js`);
     worker.current = instance;
     const versionMap = versions.current;
     instance.onmessage = (event) => {

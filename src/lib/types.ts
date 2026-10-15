@@ -24,3 +24,9 @@ export interface Heading {
   depth: number;
 }
 export const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+export interface ReaderAsset {
+  path: string;
+  blob: Blob;
+  type: string;
+}

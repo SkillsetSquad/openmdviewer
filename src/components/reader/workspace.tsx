@@ -53,6 +53,7 @@ import { Modal } from "./modal";
 import { Markdown } from "./markdown";
 import { useLocalSearch } from "@/hooks/use-local-search";
 import { useReader } from "@/lib/store";
+import { readLocalFiles, isolateImport } from "@/lib/import";
 import { storage } from "@/lib/storage";
 import { exampleDocuments } from "@/lib/examples";
 import {
@@ -85,7 +86,7 @@ const IconButton = ({
   label,
   onClick,
   children,
-  active = false,
+  active,
 }: {
   label: string;
   onClick: () => void;
@@ -117,6 +118,36 @@ export default function Workspace() {
     setPreferences,
   } = useReader();
   const [loaded, setLoaded] = useState(false);
+  const [assetURLs, setAssetURLs] = useState<Record<string, string>>({});
+  const refreshAssets = useCallback(async () => {
+    const assets = await storage.loadAssets();
+    setAssetURLs(
+      Object.fromEntries(
+        assets.map((asset) => [asset.path, URL.createObjectURL(asset.blob)]),
+      ),
+    );
+  }, []);
+  useEffect(() => {
+    storage
+      .loadAssets()
+      .then((assets) =>
+        setAssetURLs(
+          Object.fromEntries(
+            assets.map((asset) => [
+              asset.path,
+              URL.createObjectURL(asset.blob),
+            ]),
+          ),
+        ),
+      )
+      .catch(() => {});
+  }, [refreshAssets]);
+  useEffect(
+    () => () => {
+      Object.values(assetURLs).forEach((url) => URL.revokeObjectURL(url));
+    },
+    [assetURLs],
+  );
   const [storageStatus, setStorageStatus] = useState(
     "Opening local workspace…",
   );
@@ -358,59 +389,28 @@ export default function Workspace() {
   async function importFiles(files: File[]) {
     flushEdit();
     try {
-      const additions: ReaderDocument[] = [];
-      for (const file of files) {
-        if (file.size > 30 * 1024 * 1024) {
-          notify(`Skipped ${file.name}: the import limit is 30 MB per file.`);
-          continue;
-        }
-        if (/\.zip$/i.test(file.name)) {
-          const { unzipSync, strFromU8 } = await import("fflate");
-          let expanded = 0;
-          const unzipped = unzipSync(new Uint8Array(await file.arrayBuffer()), {
-            filter: (entry) => {
-              if (!supportedFile(entry.name)) return false;
-              expanded += entry.originalSize;
-              if (
-                entry.originalSize > 30 * 1024 * 1024 ||
-                expanded > 100 * 1024 * 1024
-              )
-                throw new Error(
-                  "Archive exceeds the 100 MB expanded import limit.",
-                );
-              return true;
-            },
-          });
-          for (const [path, bytes] of Object.entries(unzipped))
-            if (supportedFile(path))
-              additions.push(newDocument(path, strFromU8(bytes)));
-        } else if (supportedFile(file.name))
-          additions.push(
-            newDocument(
-              file.webkitRelativePath || `Imported/${file.name}`,
-              await file.text(),
-            ),
-          );
-      }
-      if (!additions.length) {
-        notify("Choose Markdown, MDX, text files, or a ZIP containing them.");
+      const imported = await readLocalFiles(files);
+      const additions = imported.documents;
+      if (!additions.length && !imported.assets.length) {
+        notify("Choose Markdown, text, media files, or a ZIP containing them.");
         return;
       }
-      const used = new Set(documents.map((d) => d.path));
-      for (const added of additions) {
-        const original = added.path;
-        let n = 2;
-        while (used.has(added.path))
-          added.path = original.replace(/(\.[^.]*)?$/, ` (${n++})$1`);
-        used.add(added.path);
-      }
+      isolateImport(
+        additions,
+        imported.assets,
+        new Set([
+          ...useReader.getState().documents.map((d) => d.path),
+          ...(await storage.loadAssets()).map((a) => a.path),
+        ]),
+      );
       if (additions.length + documents.length > 10000)
         throw new Error("This workspace supports up to 10,000 documents.");
-      await storage.putAll(additions);
-      setDocuments([...documents, ...additions]);
-      openDocument(additions[0].id);
+      await storage.import(additions, imported.assets);
+      await refreshAssets();
+      setDocuments([...useReader.getState().documents, ...additions]);
+      if (additions[0]) openDocument(additions[0].id);
       notify(
-        `Imported ${additions.length} ${additions.length === 1 ? "document" : "documents"}. Kept on this device.`,
+        `Imported ${additions.length} documents and ${imported.assets.length} media files. Kept on this device.`,
       );
     } catch (error) {
       notify(
@@ -428,6 +428,8 @@ export default function Workspace() {
     const data = Object.fromEntries(
       documents.map((d) => [safePath(d.path), strToU8(d.content)]),
     );
+    for (const asset of await storage.loadAssets())
+      data[asset.path] = new Uint8Array(await asset.blob.arrayBuffer());
     download(
       "openmdviewer-workspace.zip",
       zipSync(data) as BlobPart,
@@ -590,7 +592,7 @@ export default function Workspace() {
         type="file"
         aria-label="Import Markdown files"
         multiple
-        accept=".md,.markdown,.mdown,.mkd,.mdx,.txt,.zip"
+        accept=".md,.markdown,.mdown,.mkd,.mdx,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.avif,.pdf,.mp3,.wav,.mp4,.webm,.ogg"
         ref={filesRef}
         onChange={fileInput}
       />
@@ -1029,6 +1031,8 @@ export default function Workspace() {
                               doc.content.indexOf("![A still alpine lake"),
                             )}
                             onLink={navigateLink}
+                            assetURLs={assetURLs}
+                            sourcePath={doc.path}
                           />
                         </div>
                         <div className="configuration-right">
@@ -1037,11 +1041,18 @@ export default function Workspace() {
                               doc.content.indexOf("![A still alpine lake"),
                             )}
                             onLink={navigateLink}
+                            assetURLs={assetURLs}
+                            sourcePath={doc.path}
                           />
                         </div>
                       </>
                     ) : (
-                      <Markdown content={doc.content} onLink={navigateLink} />
+                      <Markdown
+                        content={doc.content}
+                        onLink={navigateLink}
+                        assetURLs={assetURLs}
+                        sourcePath={doc.path}
+                      />
                     )}
                   </article>
                   <footer className="document-footer">
@@ -1344,7 +1355,7 @@ export default function Workspace() {
                     onClick={() => copy(doc?.content || "", "Markdown copied.")}
                   >
                     <Copy size={14} />
-                    Copy Markdown<kbd>⌘ C</kbd>
+                    Copy Markdown
                   </button>
                   <button
                     onClick={() =>

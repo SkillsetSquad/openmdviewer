@@ -114,3 +114,33 @@ describe("incremental local search", () => {
     expect(index.search("")).toEqual(["a"]);
   });
 });
+
+import { isolateImport, readLocalFiles } from "../src/lib/import";
+describe("source-preserving imports", () => {
+  it("keeps relative links together when isolating a duplicate import batch", () => {
+    const doc = newDocument("Docs/Readme.md", "# Image\n![A](photo.png)");
+    const assets = [
+      { path: "Docs/photo.png", blob: new Blob(["image"]), type: "image/png" },
+    ];
+    isolateImport([doc], assets, new Set(["Docs/Readme.md"]));
+    expect(doc.path).toBe("Imports/Batch 2/Docs/Readme.md");
+    expect(assets[0].path).toBe("Imports/Batch 2/Docs/photo.png");
+    expect(doc.content).toContain("photo.png");
+  });
+  it("imports text and media without requiring remote access", async () => {
+    const result = await readLocalFiles([
+      new File(["# Hello"], "Readme.md"),
+      new File(["image"], "photo.png"),
+    ]);
+    expect(result.documents[0].path).toBe("Imported/Readme.md");
+    expect(result.assets[0].type).toBe("image/png");
+  });
+  it("rejects conflicting paths before writing any documents", async () => {
+    await expect(
+      readLocalFiles([
+        new File(["A"], "Readme.md"),
+        new File(["B"], "Readme.md"),
+      ]),
+    ).rejects.toThrow("conflicting paths");
+  });
+});

@@ -26,7 +26,7 @@ The `out/` directory is the entire application. No application server, accounts,
 
 - Responsive dark reader inspired by the supplied design: collapsible file tree, breadcrumbs, document tabs, reading toolbar, contents, properties, tags, actions, backlinks, and a local connection graph.
 - CommonMark/GFM, sortable/filterable tables with CSV copy/export, task lists, footnotes, sanitized HTML, KaTeX, lazy Shiki highlighting with line numbers/copy/download/folding, strict Mermaid diagrams with zoom/source/SVG export.
-- Local Markdown/text/MDX file imports, folder selection, ZIP imports with size limits, duplicate-path protection, drag and drop, document creation and path renaming.
+- Local Markdown/text/MDX and media imports, folder selection, ZIP imports with size limits, duplicate-path protection, drag and drop, document creation and path renaming.
 - IndexedDB document persistence; local reading preferences; scroll restoration; favorites; tags; source/split editing with CodeMirror and debounced browser autosave.
 - Incremental worker-based fuzzy search with phrases and `tag:`, `path:`, `heading:` filters, in-document find, keyboard commands, focus and presentation reading, six theme choices, font and layout settings.
 - Markdown, sanitized HTML, ZIP workspace export; browser print / Save as PDF; basic deterministic heading/link/alt-text analysis.
@@ -40,7 +40,7 @@ Remote Markdown images are blocked until individually allowed. Arbitrary MDX/Jav
 
 The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. Multiple named workspaces, OPFS/direct filesystem writing, version snapshots/comparison, richer format conversion, repository browsing, browser AI, encryption, annotations, lifecycle workflows, and workspace publishing remain future work. No placeholder buttons advertise these features.
 
-Core browser flows have automated Chromium coverage. Firefox, Safari, large-workspace benchmarks, and complete WCAG 2.2 AA conformance have not yet been certified. Folder selection depends on browser support; individual files and ZIP provide portable alternatives. Local image assets in imported folders are not yet persisted alongside Markdown.
+Core browser flows have automated Chromium coverage. Firefox, Safari, large-workspace benchmarks, and complete WCAG 2.2 AA conformance have not yet been certified. Folder selection depends on browser support; individual files and ZIP provide portable alternatives. Imported images and media are stored with their relative paths in IndexedDB and included in workspace ZIP exports. Image rendering is local; arbitrary active media is never executed.
 
 ## Development checks
 

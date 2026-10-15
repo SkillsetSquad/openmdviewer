@@ -10,7 +10,10 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "postbuild": "node scripts/prepare-static.mjs"
+    "postbuild": "node scripts/prepare-static.mjs",
+    "prebuild": "node scripts/build-worker.mjs",
+    "predev": "node scripts/build-worker.mjs",
+    "test:subpath": "node scripts/test-subpath.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -51,6 +54,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.1",
     "prettier": "^3.9.10",

@@ -34,6 +34,8 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /openmdviewer
+      - name: Verify deployed subpath in the browser
+        run: npm run test:subpath
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

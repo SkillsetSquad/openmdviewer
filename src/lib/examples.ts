@@ -43,7 +43,7 @@ Here are the most commonly used options:
 | Theme | preference | Dark | Choose your reading atmosphere |
 | Font size | number | 15 | Document text size in pixels |
 | Line spacing | number | 1.75 | A little room to breathe |
-| Reading width | number | 1040 | Maximum document width |
+| Reading width | number | 1100 | Maximum document width |
 | Storage | IndexedDB | Local | Documents stay in this browser |
 
 ![A still alpine lake beneath mountains at sunset](asset:alpine-lake)
