@@ -46,3 +46,32 @@ GitHub callouts are recognized only from their explicit `[!NOTE]`, `[!TIP]`, `[!
 ## Code reading tools
 
 See [code tools](CODE.md) for safe fence metadata, filename-based grammar selection, code search, line emphasis, wrapping, diff cues, paging, and a scratch editor. These controls preserve the original Markdown source.
+
+## Definition lists and emoji
+
+Definition lists use a term followed by one or more colon-prefixed descriptions. Indent continuation paragraphs and nested blocks by four spaces:
+
+```markdown
+Workspace :sparkles:
+:   A **local** collection of documents.
+:   Another meaning of the term.
+
+Long term
+:   First paragraph.
+
+    Second paragraph.
+
+    - Nested item
+```
+
+The reader renders native definition-list semantics (`dl`, `dt`, `dd`). Definitions participate in local search, reading statistics, and link analysis.
+
+Known GitHub emoji shortcodes such as `:smile:`, `:rocket:`, and `:+1:` become Unicode in ordinary Markdown text, headings, and explicit link labels. The outline and heading anchors use the same expanded text. Unknown shortcodes remain literal. Escape either colon (`\:smile:` or `:smile\:`) to retain a literal shortcode.
+
+Code, math, link destinations, URL display text, image alt text, raw HTML, and frontmatter values retain literal shortcodes. Original Markdown downloads preserve the imported source. Escaped callout markers such as `> \[!NOTE]` remain ordinary quotations.
+
+## Standalone HTML export
+
+HTML export uses the same sanitized Markdown extensions, definition lists, emoji, callout labels, and safe heading anchors. Frontmatter is excluded from the document body. Sanitized raw HTML tables remain tables.
+
+Images, audio, video, and their sources become text references; exported HTML does not embed or automatically fetch media. Workspace wiki references retain their labels without a navigation target. The standalone file does not include interactive reader tools, syntax highlighting, or rendered math/diagrams. Use browser print / Save as PDF for the rendered reading view, or workspace ZIP export to preserve source documents and local assets together.

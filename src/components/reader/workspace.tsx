@@ -2085,23 +2085,11 @@ export default function Workspace() {
             <button
               onClick={async () => {
                 if (!doc) return;
-                const { unified } = await import("unified");
-                const { default: remarkParse } = await import("remark-parse");
-                const { default: remarkRehype } = await import("remark-rehype");
-                const { default: rehypeSanitize } =
-                  await import("rehype-sanitize");
-                const { default: rehypeStringify } =
-                  await import("rehype-stringify");
-                const html = await unified()
-                  .use(remarkParse)
-                  .use(remarkGfmModule)
-                  .use(remarkRehype)
-                  .use(rehypeSanitize)
-                  .use(rehypeStringify)
-                  .process(doc.content);
+                const { exportHTMLBody } = await import("@/lib/html-export");
+                const html = await exportHTMLBody(doc.content);
                 download(
                   fileName(doc.path).replace(/\.[^.]+$/, ".html"),
-                  `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document export</title><style>body{font:17px/1.7 system-ui;max-width:850px;margin:50px auto;padding:20px}pre{overflow:auto;background:#eee;padding:20px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:8px}img{max-width:100%}</style><body>${html}</body></html>`,
+                  `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Document export</title><style>body{font:17px/1.7 system-ui;max-width:850px;margin:50px auto;padding:20px}pre{overflow:auto;background:#eee;padding:20px}dt{font-weight:700;margin-top:1em}dd{margin:0.4em 0 1em 1.4em}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:8px}img{max-width:100%}</style><body>${html}</body></html>`,
                   "text/html",
                 );
                 setDialog(null);
@@ -2110,7 +2098,7 @@ export default function Workspace() {
               <Code2 />
               <span>
                 <strong>HTML document</strong>
-                <small>Sanitized standalone document</small>
+                <small>Standalone document · media as references</small>
               </span>
               <ArrowDownToLine size={16} />
             </button>
@@ -2384,5 +2372,3 @@ export default function Workspace() {
     </div>
   );
 }
-// Kept outside the render path; used only when exporting HTML.
-import remarkGfmModule from "remark-gfm";

@@ -1,5 +1,10 @@
 "use client";
 import { lazy, memo, Suspense, useMemo } from "react";
+import {
+  remarkDefinitionList,
+  defListHastHandlers,
+  remarkReaderEmoji,
+} from "@/lib/markdown-extensions";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -133,7 +138,14 @@ export const Markdown = memo(function Markdown({
           </p>
         )}
         <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath, remarkReaderExtensions]}
+          remarkPlugins={[
+            remarkGfm,
+            remarkMath,
+            remarkDefinitionList,
+            remarkReaderExtensions,
+            remarkReaderEmoji,
+          ]}
+          remarkRehypeOptions={{ handlers: defListHastHandlers }}
           rehypePlugins={[
             rehypeRaw,
             rehypeRememberAnchors,

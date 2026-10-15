@@ -4059,3 +4059,28 @@ kbd {
 .diagram-fullscreen-surface:fullscreen .diagram-canvas {
   height: calc(100dvh - 100px);
 }
+
+/* Definition lists retain native term/description semantics in the reading surface. */
+.markdown-body dl {
+  margin: 1em 0 1.4em;
+}
+.markdown-body dt {
+  font-weight: 650;
+  margin-top: 1em;
+  color: var(--foreground);
+}
+.markdown-body dt:first-child {
+  margin-top: 0;
+}
+.markdown-body dd {
+  margin: 0.4em 0 1em;
+  margin-inline-start: 1.4em;
+  padding-inline-start: 0.8em;
+  border-inline-start: 2px solid var(--border);
+}
+.markdown-body dd > p:first-child {
+  margin-top: 0;
+}
+.markdown-body dd > p:last-child {
+  margin-bottom: 0;
+}

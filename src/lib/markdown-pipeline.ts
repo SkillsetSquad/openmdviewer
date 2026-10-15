@@ -65,6 +65,17 @@ export function remarkReaderExtensions() {
           first.value,
         );
       if (match) {
+        if (
+          source &&
+          first.position &&
+          !/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO|SUCCESS|ERROR)\](?:\s|$)/i.test(
+            source.slice(
+              first.position.start.offset,
+              first.position.end.offset,
+            ),
+          )
+        )
+          return;
         node.data = {
           ...node.data,
           hProperties: {
@@ -95,6 +106,7 @@ export function remarkReaderExtensions() {
         ...rawText.matchAll(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g),
       ];
       let ordinal = 0;
+      let rawStart = 0;
       for (const match of matches) {
         const raw = rawMatches[ordinal++];
         if (source && (!raw || rawMatches.length !== matches.length)) continue;
@@ -106,11 +118,20 @@ export function remarkReaderExtensions() {
           replacement.push({
             type: "text",
             value: node.value.slice(start, match.index),
+            data: { readerRawText: rawText.slice(rawStart, rawIndex) },
           });
         replacement.push({
           type: "link",
           url: `wiki:${encodeURIComponent(match[1].trim())}`,
-          children: [{ type: "text", value: match[2] || match[1] }],
+          children: [
+            {
+              type: "text",
+              value: match[2] || match[1],
+              data: {
+                readerRawText: raw?.[2] || raw?.[1] || match[2] || match[1],
+              },
+            },
+          ],
           position: node.position
             ? (() => {
                 if (!source || !raw) return node.position;
@@ -134,10 +155,15 @@ export function remarkReaderExtensions() {
             : undefined,
         });
         start = match.index! + match[0].length;
+        rawStart = rawIndex + (raw?.[0].length || match[0].length);
       }
       if (!replacement.length) return;
       if (start < node.value.length)
-        replacement.push({ type: "text", value: node.value.slice(start) });
+        replacement.push({
+          type: "text",
+          value: node.value.slice(start),
+          data: { readerRawText: rawText.slice(rawStart) },
+        });
       parent.children.splice(index, 1, ...(replacement as never[]));
       return index + replacement.length;
     });

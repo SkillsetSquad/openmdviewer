@@ -1,3 +1,8 @@
+import {
+  remarkDefinitionList,
+  defListHastHandlers,
+  remarkReaderEmoji,
+} from "./markdown-extensions";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
@@ -63,9 +68,14 @@ const parser = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkMath)
-  .use(remarkReaderExtensions);
+  .use(remarkDefinitionList)
+  .use(remarkReaderExtensions)
+  .use(remarkReaderEmoji);
 const html = unified()
-  .use(remarkRehype, { allowDangerousHtml: true })
+  .use(remarkRehype, {
+    allowDangerousHtml: true,
+    handlers: defListHastHandlers,
+  })
   .use(rehypeRaw)
   .use(rehypeRememberAnchors)
   .use(rehypeSanitize, markdownSchema)
