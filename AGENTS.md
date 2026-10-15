@@ -13,6 +13,8 @@
 - Read/process/store documents in the browser. IndexedDB for document data; localStorage only for small preferences.
 - Imported Markdown/MDX is untrusted. Sanitize HTML, disallow executable MDX, keep remote media blocked until explicit consent, and use Mermaid strict security.
 - Keep expensive optional rendering lazy. Preserve local files; browser autosave must never imply disk writes.
+- Native file picker and permission calls must start in their click handler before asynchronous preparation. Keep explicit disk writes in `src/lib/local-files.ts`, separate from browser autosave.
+- Coordinate connected-file operations across tabs, recheck disk bytes and browser revisions before committing, and verify the closed file before advancing connection baselines. External changes require review; file handles must stay out of portable exports.
 - Support root and subpath deployments. All assets must be self-hosted and offline-capable.
 
 ## Quality

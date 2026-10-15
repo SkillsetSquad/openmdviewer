@@ -25,3 +25,5 @@ Dialogs own their keyboard interaction. Background shortcuts do not replace an o
 When more than one document is open, the active tab is a keyboard stop. Left/Right move between tabs and activate the document; Home/End choose the first/last tab. Delete closes the focused tab. Separate, labeled close buttons are available without entering the tablist. After closing, focus moves to the next active tab, or to the document panel when a single tab remains.
 
 Notes and bookmarks opens local reading items for the current document. See [reading data](ANNOTATIONS.md).
+
+**Local file / Save As** opens explicit file-connection controls. Browser autosave and Ctrl/Cmd S downloads retain their existing behavior. See [connected-file support](LOCAL_FILES.md).

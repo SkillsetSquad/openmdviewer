@@ -37,6 +37,7 @@ import {
   FolderOpen,
   GitFork as Github,
   History,
+  HardDrive,
   Info,
   Link2,
   List,
@@ -97,6 +98,7 @@ import type {
   ReaderAnnotation,
   TextQuote,
 } from "@/lib/types";
+const LocalFileDialog = lazy(() => import("./local-file-dialog"));
 const Annotations = lazy(() => import("./annotations"));
 const CommandPalette = lazy(() => import("./command-palette"));
 const WorkspaceGraph = lazy(() => import("./workspace-graph"));
@@ -109,6 +111,7 @@ type DialogName =
   | "new"
   | "rename"
   | "export"
+  | "localFile"
   | "tags"
   | "analyze"
   | "health"
@@ -178,6 +181,10 @@ export default function Workspace() {
     resolvingConflict,
   } = session;
   const [dialog, setDialog] = useState<DialogName>(null);
+  const localFileBusy = useRef(false);
+  const setLocalFileBusy = useCallback((value: boolean) => {
+    localFileBusy.current = value;
+  }, []);
   const recentSearches = useSearchHistory(
     workspaceId,
     dialog === "search",
@@ -361,6 +368,7 @@ export default function Workspace() {
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (
+        localFileBusy.current ||
         hasPendingChanges() ||
         conflict ||
         storageStatus === "Browser storage unavailable"
@@ -372,7 +380,16 @@ export default function Workspace() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [flushEdit, storageStatus, conflict, hasPendingChanges]);
-  const appUpdate = useAppUpdates(flushEdit, notify);
+  const flushBeforeUpdate = useCallback(async () => {
+    if (localFileBusy.current) {
+      notify(
+        "Wait for the local file operation to finish before applying an update.",
+      );
+      return false;
+    }
+    return flushEdit();
+  }, [flushEdit, notify]);
+  const appUpdate = useAppUpdates(flushBeforeUpdate, notify);
   const openDocument = useCallback(
     (id: string) => {
       flushEdit();
@@ -701,6 +718,9 @@ export default function Workspace() {
         case "new":
           setFormValue("Untitled.md");
           setDialog("new");
+          break;
+        case "localFile":
+          setDialog("localFile");
           break;
         case "graph":
           setDialog("graph");
@@ -1034,6 +1054,12 @@ export default function Workspace() {
                   <Network size={15} />
                 </IconButton>
                 <IconButton
+                  label="Connect a local file"
+                  onClick={() => setDialog("localFile")}
+                >
+                  <HardDrive size={15} />
+                </IconButton>
+                <IconButton
                   label="Open folder"
                   onClick={() => folderRef.current?.click()}
                 >
@@ -1232,6 +1258,12 @@ export default function Workspace() {
               </IconButton>
             </div>
             <IconButton
+              label="Local file connection"
+              onClick={() => setDialog("localFile")}
+            >
+              <HardDrive size={17} />
+            </IconButton>
+            <IconButton
               label="Toggle light and dark theme"
               onClick={() => setPreferences({ theme: dark ? "light" : "dark" })}
             >
@@ -1313,7 +1345,7 @@ export default function Workspace() {
               <div className="editor-heading">
                 <Code2 size={14} />
                 Markdown source
-                <span>Autosaved to browser · download to save a file</span>
+                <span>Autosaved to browser · disk saves are explicit</span>
               </div>
               <Suspense
                 fallback={<p className="empty-panel">Loading editor…</p>}
@@ -2017,6 +2049,79 @@ export default function Workspace() {
           />
         </Suspense>
       )}
+      {dialog === "localFile" && (
+        <Suspense
+          fallback={
+            <Modal
+              title="Local file connection"
+              onClose={() => setDialog(null)}
+            >
+              <p role="status">Loading local file controls…</p>
+            </Modal>
+          }
+        >
+          <LocalFileDialog
+            key={`${workspaceId}:${doc?.id || "empty"}`}
+            doc={doc}
+            workspaceId={workspaceId}
+            flush={flushEdit}
+            onBusy={setLocalFileBusy}
+            onClose={() => setDialog(null)}
+            onImport={() => {
+              filesRef.current?.click();
+              setDialog(null);
+            }}
+            onDownload={() => {
+              const current = useReader
+                .getState()
+                .documents.find((item) => item.id === doc?.id);
+              if (current) download(current.path, current.content);
+            }}
+            onOpened={(added) => {
+              if (useReader.getState().workspaceId !== workspaceId) {
+                notify(
+                  "File connected in the previous workspace. Switch back to open its browser copy.",
+                );
+                return;
+              }
+              const current = useReader.getState().documents;
+              if (!current.some((item) => item.id === added.id))
+                setDocuments([...current, added]);
+              openDocument(added.id);
+              setDialog(null);
+              notify(
+                "Opened the connected browser copy. Use Reload from disk to check later external changes.",
+              );
+            }}
+            onLoaded={async (snapshot, content) => {
+              const current = useReader
+                .getState()
+                .documents.find((item) => item.id === snapshot.id);
+              if (
+                !current ||
+                current.content !== snapshot.content ||
+                current.revision !== snapshot.revision ||
+                useReader.getState().workspaceId !== workspaceId
+              )
+                return null;
+              const updated = { ...current, content, updatedAt: Date.now() };
+              if (!(await save(updated, "restore"))) return null;
+              useReader.setState((state) => ({
+                documents: state.documents.map((item) =>
+                  item.id === snapshot.id
+                    ? { ...item, content, updatedAt: updated.updatedAt }
+                    : item,
+                ),
+              }));
+              return (
+                useReader
+                  .getState()
+                  .documents.find((item) => item.id === snapshot.id) || null
+              );
+            }}
+          />
+        </Suspense>
+      )}
       {dialog === "settings" && (
         <Modal title="Make yourself at home" onClose={() => setDialog(null)}>
           <p className="dialog-description">
@@ -2218,7 +2323,7 @@ export default function Workspace() {
       {dialog === "export" && (
         <Modal title="Take your words with you" onClose={() => setDialog(null)}>
           <p className="dialog-description">
-            Download a copy. Your originals stay right where they are.
+            Download a copy, print, or open local-file save controls.
           </p>
           <div className="export-options">
             <button
@@ -2231,6 +2336,14 @@ export default function Workspace() {
               <span>
                 <strong>Markdown</strong>
                 <small>The original, editable source</small>
+              </span>
+              <ArrowDownToLine size={16} />
+            </button>
+            <button onClick={() => setDialog("localFile")}>
+              <HardDrive />
+              <span>
+                <strong>Local file / Save As</strong>
+                <small>Choose a disk file and save explicitly</small>
               </span>
               <ArrowDownToLine size={16} />
             </button>

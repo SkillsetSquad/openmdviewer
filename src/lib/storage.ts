@@ -1,3 +1,4 @@
+import type { LocalFileSource } from "./local-file-types";
 import Dexie, { type EntityTable, type Table } from "dexie";
 import type {
   ReaderDocument,
@@ -35,6 +36,7 @@ export function createStorage(name = "openmdviewer") {
     workspaces: EntityTable<LocalWorkspace, "id">;
     snapshots: EntityTable<DocumentSnapshot, "id">;
     searchHistory: Table<RecentSearch, [string, string]>;
+    fileSources: EntityTable<LocalFileSource, "documentId">;
   };
   db.version(1).stores({ documents: "id, path, updatedAt, favorite" });
   db.version(2).stores({
@@ -67,6 +69,7 @@ export function createStorage(name = "openmdviewer") {
       });
     });
   db.version(4).stores({ searchHistory: "[workspaceId+key], workspaceId" });
+  db.version(5).stores({ fileSources: "documentId, workspaceId" });
   const scoped = (id = "default") =>
     db.documents.where("workspaceId").equals(id);
   async function ensurePath(doc: ReaderDocument) {
@@ -103,6 +106,49 @@ export function createStorage(name = "openmdviewer") {
   }
   const api = {
     close: () => db.close(),
+    fileSource: (documentId: string) => db.fileSources.get(documentId),
+    fileSources: (workspaceId: string) =>
+      db.fileSources.where("workspaceId").equals(workspaceId).toArray(),
+    setFileSource: (source: LocalFileSource, expectedToken: string | null) =>
+      db.transaction("rw", db.documents, db.fileSources, async () => {
+        const current = await db.fileSources.get(source.documentId);
+        if ((current?.token || null) !== expectedToken)
+          throw new Error(
+            "Another tab changed this file connection. Close and reopen local file controls.",
+          );
+        const doc = await db.documents.get(source.documentId);
+        if (
+          !doc ||
+          doc.deletedAt ||
+          (doc.workspaceId || "default") !== source.workspaceId
+        )
+          throw new Error(
+            "This browser document is no longer available in its workspace.",
+          );
+        await db.fileSources.put(source);
+      }),
+    disconnectFile: (documentId: string, expectedToken: string) =>
+      db.transaction("rw", db.fileSources, async () => {
+        const current = await db.fileSources.get(documentId);
+        if (current?.token !== expectedToken)
+          throw new Error(
+            "Another tab changed this file connection. Close and reopen local file controls.",
+          );
+        await db.fileSources.delete(documentId);
+      }),
+    connectFile: (doc: ReaderDocument, source: LocalFileSource) =>
+      db.transaction("rw", db.documents, db.fileSources, async () => {
+        await ensurePath(doc);
+        if (await db.documents.get(doc.id))
+          throw new Error("That browser document already exists.");
+        if (
+          source.documentId !== doc.id ||
+          source.workspaceId !== (doc.workspaceId || "default")
+        )
+          throw new Error("Invalid file connection workspace.");
+        await db.documents.add(doc);
+        await db.fileSources.add(source);
+      }),
     searchHistory: async (workspaceId: string) => {
       const items = await db.searchHistory
         .where("workspaceId")

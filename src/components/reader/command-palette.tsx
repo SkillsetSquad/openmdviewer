@@ -11,6 +11,7 @@ import {
   FileText,
   FolderOpen,
   History,
+  HardDrive,
   Info,
   Link2,
   Maximize2,
@@ -45,6 +46,7 @@ import { fileName } from "@/lib/paths";
 
 const icons = {
   files: Upload,
+  localFile: HardDrive,
   folder: FolderOpen,
   new: FilePlus2,
   graph: Network,

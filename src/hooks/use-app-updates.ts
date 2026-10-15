@@ -42,7 +42,7 @@ export function useAppUpdates(
         reloading.current = false;
         setApplying(false);
         notify(
-          "An update is ready. Resolve conflicting edits or download a copy before reloading.",
+          "An update is ready. Finish local file operations and resolve pending browser changes before reloading.",
         );
       }
     };
@@ -84,7 +84,9 @@ export function useAppUpdates(
     setApplying(true);
     if (!(await flush())) {
       setApplying(false);
-      notify("Resolve or download unsaved changes before applying the update.");
+      notify(
+        "Finish local file operations and resolve pending browser changes before applying the update.",
+      );
       return;
     }
     waiting.postMessage("ACTIVATE_UPDATE");

@@ -14,6 +14,11 @@ export const commands = [
     quick: true,
   },
   {
+    id: "localFile",
+    label: "Local file / Save As",
+    keywords: "connected filesystem disk save open file permissions",
+  },
+  {
     id: "new",
     label: "Create document",
     keywords: "new note markdown",
