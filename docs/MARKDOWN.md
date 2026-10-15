@@ -41,7 +41,7 @@ Wiki names first resolve relative to the current folder, then by a unique worksp
 
 Headings support inline formatting, Setext syntax, Unicode, and duplicate-heading suffixes. Generated and imported HTML IDs keep a `user-content-` prefix to avoid DOM clobbering. Navigation accepts ordinary source anchors such as `#static-hosting`; the reader resolves the corresponding safe DOM ID. Sanitized HTML anchors and footnotes have their fragment links repaired rather than disabling the sanitizer's protection.
 
-GitHub callouts are recognized only from their explicit `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`, `[!INFO]`, `[!SUCCESS]`, or `[!ERROR]` marker. Ordinary blockquotes are left as quotations.
+Callouts use explicit markers such as `[!NOTE]`, `[!TIP]`, and `[!WARNING]`, with standard/custom types, optional titles, and `+` / `-` folding. See [callout syntax and behavior](CALLOUTS.md). Escaped markers and ordinary blockquotes remain quotations.
 
 ## Code reading tools
 

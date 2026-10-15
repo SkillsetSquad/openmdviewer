@@ -5,12 +5,14 @@ declare module "hast" {
 }
 import { toText } from "hast-util-to-text";
 import type { SourceReference } from "./types";
-import { defaultSchema } from "rehype-sanitize";
+import { defaultSchema, type Options as Schema } from "rehype-sanitize";
 import { visit } from "unist-util-visit";
-import type { Root as MdRoot, Text, Link, Blockquote } from "mdast";
+import type { Root as MdRoot, Text, Link } from "mdast";
+import { prepareCallout } from "./callouts";
+export { rehypeCalloutLabels } from "./callouts";
 import type { Root as HtmlRoot } from "hast";
 import type { VFile } from "vfile";
-export const markdownSchema = {
+export const markdownSchema: Schema = {
   ...defaultSchema,
   tagNames: [
     ...(defaultSchema.tagNames || []),
@@ -30,6 +32,13 @@ export const markdownSchema = {
     video: ["src", "poster", "title"],
     source: ["src", "type"],
     track: ["src", "kind", "label", "srcLang", "default"],
+    p: [...(defaultSchema.attributes?.p || []), ["className", "callout-label"]],
+    details: [...(defaultSchema.attributes?.details || []), "dataCallout"],
+    summary: [
+      ...(defaultSchema.attributes?.summary || []),
+      "dataCallout",
+      ["className", "callout-label"],
+    ],
     blockquote: [
       ...(defaultSchema.attributes?.blockquote || []),
       "dataCallout",
@@ -55,37 +64,7 @@ export function remarkReaderExtensions() {
         },
       };
     });
-    visit(tree, "blockquote", (node: Blockquote) => {
-      const paragraph = node.children[0];
-      if (paragraph?.type !== "paragraph") return;
-      const first = paragraph.children[0];
-      if (first?.type !== "text") return;
-      const match =
-        /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO|SUCCESS|ERROR)\](?:\s|$)/i.exec(
-          first.value,
-        );
-      if (match) {
-        if (
-          source &&
-          first.position &&
-          !/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO|SUCCESS|ERROR)\](?:\s|$)/i.test(
-            source.slice(
-              first.position.start.offset,
-              first.position.end.offset,
-            ),
-          )
-        )
-          return;
-        node.data = {
-          ...node.data,
-          hProperties: {
-            ...node.data?.hProperties,
-            dataCallout: match[1].toLowerCase(),
-          },
-        };
-        first.value = first.value.slice(match[0].length);
-      }
-    });
+    visit(tree, "blockquote", (node) => prepareCallout(node, source));
     visit(tree, "text", (node: Text, index, parent) => {
       if (
         !parent ||

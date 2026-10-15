@@ -1,4 +1,5 @@
 "use client";
+import { revealElement } from "@/lib/reveal-element";
 import type { CommandId } from "@/lib/commands";
 import type { HealthIssue } from "@/lib/health";
 import { resolveDocumentLink } from "@/lib/references";
@@ -253,7 +254,9 @@ export default function Workspace() {
         const match = locateQuote(readingText(root), item.quote);
         if (match.range) {
           root.focus({ preventScroll: true });
-          match.range.startContainer.parentElement?.scrollIntoView({
+          revealElement(
+            match.range.startContainer.parentElement,
+          )?.scrollIntoView({
             block: "center",
             behavior: "smooth",
           });
@@ -274,7 +277,10 @@ export default function Workspace() {
           : root;
         if (heading) {
           root.focus({ preventScroll: true });
-          heading.scrollIntoView({ block: "start", behavior: "smooth" });
+          revealElement(heading)?.scrollIntoView({
+            block: "start",
+            behavior: "smooth",
+          });
         } else
           notify(
             "That bookmarked section is no longer found. The bookmark is preserved.",
@@ -475,9 +481,9 @@ export default function Workspace() {
         if (result.actualAnchor)
           setTimeout(
             () =>
-              document
-                .getElementById(result.actualAnchor)
-                ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+              revealElement(
+                document.getElementById(result.actualAnchor),
+              )?.scrollIntoView({ behavior: "smooth", block: "start" }),
             target.id === state.activeId ? 0 : 100,
           );
       } catch {
@@ -667,9 +673,10 @@ export default function Workspace() {
     }
   }
   function jump(id: string) {
-    document
-      .getElementById(id)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    revealElement(document.getElementById(id))?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
     setActiveHeading(id);
   }
   function findNext() {
@@ -694,7 +701,10 @@ export default function Workspace() {
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
-    node.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+    revealElement(node.parentElement)?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
   }
   const commandsOnly = query.trimStart().startsWith(">");
   const documentQuery = commandsOnly ? "" : query;

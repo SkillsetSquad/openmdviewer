@@ -14,13 +14,19 @@ import rehypeSlug from "rehype-slug";
 import rehypeKatex from "rehype-katex";
 import { rehypeMathTools, rehypeMathErrors } from "@/lib/math-tools";
 import { MathExpression } from "./math-expression";
-import { Info, Lightbulb, ShieldAlert } from "lucide-react";
+import {
+  BlockquoteRenderer,
+  DetailsRenderer,
+  SummaryRenderer,
+  useCalloutPrint,
+} from "./callout";
 import { InteractiveTable } from "./interactive-table";
 import { CodeBlock } from "./code-block";
 import { frontmatter } from "@/lib/frontmatter";
 import {
   markdownSchema,
   remarkReaderExtensions,
+  rehypeCalloutLabels,
   rehypeRememberAnchors,
   rehypeRepairAnchors,
   rehypeHeadingAliases,
@@ -88,6 +94,7 @@ export const Markdown = memo(function Markdown({
   sourcePath?: string;
   galleryContent?: string;
 }) {
+  useCalloutPrint();
   const parsed = useMemo(() => frontmatter(content), [content]);
   const components: Components = {
     input: ({ checked, type }) => (
@@ -121,27 +128,9 @@ export const Markdown = memo(function Markdown({
     audio: AudioRenderer,
     source: () => null,
     track: () => null,
-    blockquote: ({ children, node }) => {
-      const type = String(node?.properties.dataCallout || "");
-      const tip = ["tip", "success"].includes(type);
-      const warning = ["warning", "caution", "error"].includes(type);
-      const Icon = tip ? Lightbulb : warning ? ShieldAlert : Info;
-      return (
-        <blockquote
-          className={
-            type
-              ? `callout ${tip ? "tip" : warning ? "warning" : "note"}`
-              : "quote"
-          }
-        >
-          {type && <Icon className="callout-icon" size={20} />}
-          <div>
-            {type && <p className="callout-label">{type.toUpperCase()}</p>}
-            {children}
-          </div>
-        </blockquote>
-      );
-    },
+    blockquote: BlockquoteRenderer,
+    details: DetailsRenderer,
+    summary: SummaryRenderer,
     table: TableRenderer,
   };
   return (
@@ -169,6 +158,7 @@ export const Markdown = memo(function Markdown({
             rehypeRaw,
             rehypeRememberAnchors,
             [rehypeSanitize, markdownSchema],
+            rehypeCalloutLabels,
             rehypeRepairAnchors,
             [rehypeSlug, { prefix: "user-content-" }],
             rehypeHeadingAliases,

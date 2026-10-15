@@ -176,6 +176,8 @@ summary:focus-visible {
   --selection-bg: #284572;
   --code-bg: #0d1218;
   --callout-bg: #172230;
+  --callout-tip-ink: #65dba3;
+  --callout-warning-ink: #e9b267;
   --shadow: 0 20px 80px #0006;
   --background: var(--app-bg);
   --primary: #e7ebf2;
@@ -209,6 +211,8 @@ summary:focus-visible {
   --selection-bg: #dceaff;
   --code-bg: #f5f7fa;
   --callout-bg: #edf4fd;
+  --callout-tip-ink: #0e4d2f;
+  --callout-warning-ink: #633700;
   --primary: #202b3c;
   --primary-foreground: white;
   color-scheme: light;
@@ -225,6 +229,8 @@ summary:focus-visible {
   --selection-bg: #dfcba7;
   --code-bg: #eee5d7;
   --callout-bg: #ece3d0;
+  --callout-tip-ink: #0e4d2f;
+  --callout-warning-ink: #633700;
   --primary: #44392b;
   --primary-foreground: white;
   color-scheme: light;
@@ -259,6 +265,8 @@ summary:focus-visible {
     --selection-bg: #dceaff;
     --code-bg: #f5f7fa;
     --callout-bg: #edf4fd;
+    --callout-tip-ink: #0e4d2f;
+    --callout-warning-ink: #633700;
     --primary: #202b3c;
     --primary-foreground: white;
     color-scheme: light;
@@ -902,7 +910,7 @@ kbd {
 .markdown-body .callout p {
   margin: 0 0 0.5em;
 }
-.markdown-body .callout p:first-child {
+.markdown-body .callout .callout-label {
   font-size: 9px;
   letter-spacing: 1px;
   color: var(--accent-blue);
@@ -911,17 +919,25 @@ kbd {
   margin-bottom: 0;
 }
 .markdown-body .callout.tip {
-  border-color: #4dba8c55;
-  border-left-color: #65dba3;
-  background: linear-gradient(110deg, #20413b55, #15352c44);
+  border-color: color-mix(in srgb, var(--callout-tip-ink) 35%, var(--border));
+  border-left-color: var(--callout-tip-ink);
+  background: color-mix(in srgb, var(--app-bg) 90%, var(--callout-tip-ink));
 }
-.markdown-body .callout.tip .callout-icon,
-.markdown-body .callout.tip p:first-child {
-  color: #65dba3;
+.markdown-body .callout.tip > .callout-icon,
+.markdown-body .callout.tip > div > .callout-label,
+.markdown-body .callout.tip > summary.callout-label,
+.markdown-body .callout.tip > summary > .callout-icon {
+  color: var(--callout-tip-ink);
 }
 .markdown-body .callout.warning {
-  border-left-color: #e9b267;
-  background: #50361e44;
+  border-left-color: var(--callout-warning-ink);
+  background: color-mix(in srgb, var(--app-bg) 90%, var(--callout-warning-ink));
+}
+.markdown-body .callout.warning > .callout-icon,
+.markdown-body .callout.warning > div > .callout-label,
+.markdown-body .callout.warning > summary.callout-label,
+.markdown-body .callout.warning > summary > .callout-icon {
+  color: var(--callout-warning-ink);
 }
 .markdown-body .quote {
   padding: 14px 22px;
@@ -4197,4 +4213,69 @@ kbd {
 }
 .math-error {
   overflow-wrap: anywhere;
+}
+
+/* Native callout disclosures preserve document semantics and keyboard interaction. */
+.markdown-body .callout > div {
+  min-width: 0;
+  flex: 1;
+}
+.markdown-body .callout .callout-label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.025em;
+}
+.markdown-body details.callout-fold {
+  display: block;
+  margin: 1.3em 0;
+}
+.markdown-body .callout .callout {
+  font-size: 1em;
+}
+.callout-fold > summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+.callout-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.callout-fold > summary .callout-icon {
+  margin-top: 0;
+}
+.callout-fold > summary > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.callout-fold > summary .callout-chevron {
+  flex-shrink: 0;
+  transition: transform 120ms ease;
+  transform: rotate(-90deg);
+}
+.callout-fold[open] > summary .callout-chevron {
+  transform: rotate(0);
+}
+.callout-fold > summary:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.markdown-body .callout-fold[open] > summary {
+  margin-bottom: 0.7em;
+}
+.markdown-body .callout-fold > :last-child {
+  margin-bottom: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .callout-chevron {
+    transition: none !important;
+  }
+}
+@media print {
+  .callout-chevron {
+    display: none;
+  }
 }

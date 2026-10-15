@@ -21,6 +21,7 @@ import { frontmatter } from "./frontmatter";
 import {
   markdownSchema,
   remarkReaderExtensions,
+  rehypeCalloutLabels,
   rehypeRememberAnchors,
   rehypeRepairAnchors,
   rehypeHeadingAliases,
@@ -79,6 +80,7 @@ const html = unified()
   .use(rehypeRaw)
   .use(rehypeRememberAnchors)
   .use(rehypeSanitize, markdownSchema)
+  .use(rehypeCalloutLabels)
   .use(rehypeRepairAnchors)
   .use(rehypeSlug, { prefix: "user-content-" })
   .use(rehypeHeadingAliases);

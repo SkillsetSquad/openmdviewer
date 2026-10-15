@@ -8,11 +8,12 @@ import rehypeSanitize from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
 import rehypeSlug from "rehype-slug";
 import { visit, SKIP } from "unist-util-visit";
-import type { Root, Element } from "hast";
+import type { Root } from "hast";
 import { frontmatter } from "./frontmatter";
 import {
   markdownSchema,
   remarkReaderExtensions,
+  rehypeCalloutLabels,
   rehypeRememberAnchors,
   rehypeRepairAnchors,
   rehypeHeadingAliases,
@@ -46,30 +47,29 @@ function exportPresentation() {
         });
         return SKIP;
       }
-      if (
-        node.tagName === "blockquote" &&
-        typeof node.properties.dataCallout === "string"
-      ) {
-        const label: Element = {
-          type: "element",
-          tagName: "p",
-          properties: {},
-          children: [
-            {
-              type: "element",
-              tagName: "strong",
-              properties: {},
-              children: [
-                {
-                  type: "text",
-                  value: node.properties.dataCallout.toUpperCase(),
-                },
-              ],
-            },
-          ],
-        };
-        node.children.unshift(label);
+      if (node.properties.dataCallout) {
+        // Flatten disclosures for a portable, fully readable and printable export.
+        if (node.tagName === "details") {
+          node.tagName = "blockquote";
+          delete node.properties.open;
+        }
+        if (node.tagName === "summary") node.tagName = "p";
         delete node.properties.dataCallout;
+      }
+      if (
+        node.tagName === "p" &&
+        Array.isArray(node.properties.className) &&
+        node.properties.className.includes("callout-label")
+      ) {
+        node.children = [
+          {
+            type: "element",
+            tagName: "strong",
+            properties: {},
+            children: node.children,
+          },
+        ];
+        delete node.properties.className;
       }
       delete node.properties.dataCodeMeta;
       delete node.properties.dataCodeBlock;
@@ -112,6 +112,7 @@ export async function exportHTMLBody(content: string) {
       .use(rehypeRaw)
       .use(rehypeRememberAnchors)
       .use(rehypeSanitize, markdownSchema)
+      .use(rehypeCalloutLabels)
       .use(rehypeRepairAnchors)
       .use(rehypeSlug, { prefix: "user-content-" })
       .use(rehypeHeadingAliases)

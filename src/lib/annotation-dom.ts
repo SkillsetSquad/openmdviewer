@@ -30,6 +30,18 @@ export function captureQuote(
     !root.contains(range.endContainer)
   )
     return;
+  // Keep this explicit for browsers whose Selection string behavior differs for native disclosures.
+  const crossesHiddenBody = Array.from(
+    root.querySelectorAll("details:not([open])"),
+  ).some((details) =>
+    Array.from(details.childNodes).some(
+      (child) =>
+        child.nodeName !== "SUMMARY" &&
+        child.textContent?.trim() &&
+        range.intersectsNode(child),
+    ),
+  );
+  if (crossesHiddenBody) return;
   const index = readingText(root);
   let start = -1,
     end = -1;
@@ -44,10 +56,10 @@ export function captureQuote(
   }
   if (start < 0 || end <= start || end - start > 8000) return;
   const quote = quoteAt(index.text, start, end);
-  // Ignore generated controls and unsupported rendered widgets, even when selected across blocks.
+  // Reject selections crossing controls, unsupported widgets, or text hidden by a closed disclosure.
   if (
     !quote.exact.trim() ||
-    quote.exact.replace(/\s/g, "") !== range.toString().replace(/\s/g, "")
+    quote.exact.replace(/\s/g, "") !== selection.toString().replace(/\s/g, "")
   )
     return;
   return quote;
