@@ -30,6 +30,14 @@ test("equation tools copy exact LaTeX, expose accessible source and MathML, reta
   await expect(inline.locator("math")).toHaveCount(1);
   await expect(displays).toHaveCount(3);
   await expect(displays.first().locator(".tag")).toContainText("(A)");
+  const renderedBounds = await displays
+    .first()
+    .locator(".math-rendered")
+    .boundingBox();
+  const tagBounds = await displays.first().locator(".tag").boundingBox();
+  expect(tagBounds!.x).toBeGreaterThan(
+    renderedBounds!.x + renderedBounds!.width * 0.75,
+  );
   await inline
     .getByRole("button", { name: "Copy LaTeX source", exact: true })
     .click();

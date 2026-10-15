@@ -1,6 +1,6 @@
 # Equations
 
-The reader supports inline and display LaTeX through KaTeX. Processing and fonts remain on the device and work offline after the application is cached.
+The reader supports inline and display LaTeX through KaTeX. Its stylesheet dependency is pinned to the version used by the Markdown renderer so equation layout and fonts match. Processing and fonts remain on the device and work offline after the application is cached.
 
 ````markdown
 Inline $x^2 + y^2$ stays in the paragraph.
