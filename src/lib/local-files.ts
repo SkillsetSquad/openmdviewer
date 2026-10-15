@@ -79,13 +79,24 @@ export function encodeDiskContent(
   content: string,
   format: Pick<DiskFile, "bom" | "lineEnding">,
 ) {
+  if (content.includes("\0"))
+    throw new Error(
+      "The browser document contains NUL characters. Remove them before saving a UTF-8 text file.",
+    );
   if (format.lineEnding === "crlf")
     content = content.replace(/\r\n?|\n/g, "\n").replace(/\n/g, "\r\n");
-  const bytes = new TextEncoder().encode(
-    (format.bom ? "\ufeff" : "") + content,
-  );
+  // A literal leading U+FEFF needs its own encoding marker so decoding does not consume the text character.
+  const encodedText =
+    (format.bom || content.startsWith("\ufeff") ? "\ufeff" : "") + content;
+  const bytes = new TextEncoder().encode(encodedText);
   if (bytes.length > localFileLimit)
     throw new Error("Local files support up to 30 MB per document.");
+  if (
+    new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes) !== encodedText
+  )
+    throw new Error(
+      "The browser document contains an incomplete Unicode character. Finish editing or replace it before saving.",
+    );
   return bytes;
 }
 export class DiskFileConflict extends Error {

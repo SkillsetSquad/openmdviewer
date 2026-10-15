@@ -176,3 +176,41 @@ describe("explicit checked local file writes", () => {
     ).toBe(mixed.content);
   });
 });
+
+it("rejects unreadable browser strings before opening or overwriting a disk file", async () => {
+  for (const content of [
+    "bad\0text",
+    "incomplete \ud800",
+    "incomplete \udc00",
+  ]) {
+    const disk = new Disk("original bytes"),
+      handle = disk.handle(),
+      original = await readDiskFile(handle);
+    await expect(
+      writeDiskFile(handle, content, original.hash, async () => {}),
+    ).rejects.toThrow(/NUL|Unicode/);
+    expect(disk.opened).toBe(0);
+    expect(disk.text()).toBe("original bytes");
+  }
+});
+it("retains a literal leading BOM character in browser text without growing encoding markers on repeat saves", async () => {
+  const disk = new Disk(""),
+    handle = disk.handle(),
+    original = await readDiskFile(handle),
+    content = "\ufeff# Literal leading character\n";
+  const first = await writeDiskFile(
+    handle,
+    content,
+    original.hash,
+    async () => {},
+  );
+  expect(first.disk.content).toBe(content);
+  const second = await writeDiskFile(
+    handle,
+    content,
+    first.disk.hash,
+    async () => {},
+  );
+  expect(second.changed).toBe(false);
+  expect(disk.closed).toBe(1);
+});

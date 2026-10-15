@@ -585,3 +585,82 @@ test("a pending file permission participates in unload warnings and blocks updat
     "# Pending edit\n\nWait for explicit permission.\n",
   );
 });
+
+test("invalid browser text cannot overwrite a chosen file and literal BOM characters remain stable across repeat saves", async ({
+  page,
+}) => {
+  await diskWrite(page, "Target.md", "# Preserve existing disk bytes\n");
+  await pickerName(page, "Target.md");
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Nul.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("# Invalid\n\nNUL\0text"),
+    });
+  await expect(
+    page.getByRole("tab", { name: "Nul.md", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  let dialog = await controls(page);
+  await dialog.getByRole("button", { name: "Save As…", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "contains NUL characters",
+  );
+  expect(await diskRead(page, "Target.md")).toBe(
+    "# Preserve existing disk bytes\n",
+  );
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await pickerName(page, "Literal-target.md");
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Literal.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("\ufeff\ufeff# Literal leading character\n"),
+    });
+  await expect(
+    page.getByRole("tab", { name: "Literal.md", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  dialog = await controls(page);
+  await dialog.getByRole("button", { name: "Save As…", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "Saved and verified Literal-target.md",
+  );
+  const first = await page.evaluate(async () =>
+    Array.from(
+      new Uint8Array(
+        await (
+          await (
+            await (
+              await navigator.storage.getDirectory()
+            ).getFileHandle("Literal-target.md")
+          ).getFile()
+        ).arrayBuffer(),
+      ),
+    ),
+  );
+  expect(first.slice(0, 6)).toEqual([239, 187, 191, 239, 187, 191]);
+  await dialog
+    .getByRole("button", { name: "Save to connected file", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "No disk write was needed",
+  );
+  const second = await page.evaluate(async () =>
+    Array.from(
+      new Uint8Array(
+        await (
+          await (
+            await (
+              await navigator.storage.getDirectory()
+            ).getFileHandle("Literal-target.md")
+          ).getFile()
+        ).arrayBuffer(),
+      ),
+    ),
+  );
+  expect(second).toEqual(first);
+});
