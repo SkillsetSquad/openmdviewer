@@ -1,4 +1,7 @@
 export interface ReaderDocument {
+  workspaceId?: string;
+  revision?: number;
+  deletedAt?: number;
   id: string;
   path: string;
   content: string;
@@ -26,7 +29,25 @@ export interface Heading {
 export const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export interface ReaderAsset {
+  workspaceId?: string;
   path: string;
   blob: Blob;
   type: string;
+}
+
+export interface LocalWorkspace {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  createdAt: number;
+  initialized: boolean;
+}
+export interface DocumentSnapshot {
+  id: string;
+  documentId: string;
+  workspaceId: string;
+  document: ReaderDocument;
+  createdAt: number;
+  reason: "edit" | "restore" | "trash";
 }
