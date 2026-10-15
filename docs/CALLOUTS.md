@@ -34,7 +34,7 @@ Add `+` immediately after the closing bracket to start expanded, or `-` to start
 
 The reader uses native `details` and `summary` elements. Focus the summary and press Enter or Space to toggle it. Folding changes only the current reading view; it never edits Markdown and resets to the source's declared state after reopening/reloading a document. Theme or preference changes preserve the current view state.
 
-Callout titles and bodies participate in local search, statistics, links, and annotations. Open a callout before selecting a passage within it; selections spanning hidden content are not captured as one continuous quote. Heading navigation, document links, in-document find, and saved reading locations reveal any enclosing disclosures before scrolling. Browser printing expands closed callouts for the print operation and then restores their prior states.
+Callout titles and bodies participate in local search, statistics, links, and annotations. Open a callout before selecting a passage within it; selections spanning hidden content are not captured as one continuous quote. Heading navigation, document links, in-document find, and saved reading locations reveal any enclosing disclosures before scrolling. Browser printing uses a light paper palette across reading themes, expands closed callouts for the print operation, and then restores their prior states.
 
 Standalone HTML export flattens callouts into labeled blockquotes so every body is readable and printable without JavaScript. Markdown and workspace ZIP exports preserve the exact source, including fold markers.
 

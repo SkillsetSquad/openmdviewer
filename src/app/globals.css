@@ -2092,7 +2092,8 @@ kbd {
     color: black !important;
     height: auto !important;
   }
-  .workspace {
+  /* Match theme-class specificity so the paper palette wins in every reading theme. */
+  .workspace[class] {
     display: block;
     height: auto;
     overflow: visible;
@@ -2105,6 +2106,9 @@ kbd {
     --elevated: #eee;
     --border: #ccc;
     --accent-blue: #1559a8;
+    --callout-bg: #f5f7fa;
+    --callout-tip-ink: #0e4d2f;
+    --callout-warning-ink: #633700;
   }
   .left-sidebar,
   .right-sidebar,

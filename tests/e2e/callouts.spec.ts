@@ -87,6 +87,13 @@ test("print and HTML export include folded contents, downloads preserve source, 
   await expect(
     page.getByRole("heading", { name: "Hidden heading", exact: true }),
   ).toBeVisible();
+  expect(
+    (
+      await new AxeBuilder({ page }).include("article").analyze()
+    ).violations.filter((v) =>
+      ["serious", "critical"].includes(v.impact || ""),
+    ),
+  ).toEqual([]);
   await page.emulateMedia({ media: "screen" });
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
   await expect(outer).not.toHaveAttribute("open");
@@ -261,4 +268,38 @@ test("a passage selection spanning a closed callout cannot capture unseen body t
     exact: true,
   });
   await expect(dialog.locator(".annotation-compose blockquote")).toHaveCount(0);
+});
+
+test("printed callouts keep a readable paper palette in every reading theme", async ({
+  page,
+}) => {
+  await load(page);
+  for (const theme of [
+    "dark",
+    "light",
+    "sepia",
+    "oled",
+    "contrast",
+    "system",
+  ]) {
+    await page
+      .getByRole("button", { name: "Reading settings", exact: true })
+      .click();
+    await page
+      .getByRole("combobox", { name: "Appearance", exact: true })
+      .selectOption(theme);
+    await page
+      .getByRole("button", { name: "Close dialog", exact: true })
+      .click();
+    await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
+    await page.emulateMedia({ media: "print" });
+    const violations = (
+      await new AxeBuilder({ page }).include("article").analyze()
+    ).violations.filter((v) =>
+      ["serious", "critical"].includes(v.impact || ""),
+    );
+    expect(violations, `Print contrast in ${theme}`).toEqual([]);
+    await page.emulateMedia({ media: "screen" });
+    await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  }
 });
