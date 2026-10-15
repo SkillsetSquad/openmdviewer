@@ -9,6 +9,7 @@ import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import rehypeKatex from "rehype-katex";
 import { Info, Lightbulb, ShieldAlert, X } from "lucide-react";
+import { InteractiveTable } from "./interactive-table";
 import { CodeBlock } from "./code-block";
 import { basePath } from "@/lib/types";
 const Diagram = lazy(() => import("./diagram"));
@@ -170,11 +171,7 @@ export function Markdown({
         </blockquote>
       );
     },
-    table: ({ children }) => (
-      <div className="table-scroll">
-        <table>{children}</table>
-      </div>
-    ),
+    table: ({ children }) => <InteractiveTable>{children}</InteractiveTable>,
   };
   return (
     <ReactMarkdown

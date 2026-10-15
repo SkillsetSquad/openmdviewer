@@ -171,3 +171,44 @@ test("starts offline and opens lazy rendering modules from the application cache
   await page.getByRole("button", { name: "Split view", exact: true }).click();
   await expect(page.locator(".cm-content")).toBeVisible();
 });
+
+test("sorts and filters tables without changing Markdown and exports safe CSV", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "Table.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(
+        "# Table fixture\n\n| Name | Count |\n| --- | --- |\n| Zebra | 12 |\n| Alpha | 2 |\n| =FORMULA() | 3 |",
+      ),
+    });
+  await expect(
+    page.getByRole("heading", { name: "Table fixture" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Count", exact: true }).click();
+  await expect(page.locator("tbody tr").first()).toContainText("Alpha");
+  await page.getByRole("textbox", { name: "Filter table rows" }).fill("Zebra");
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await page.getByRole("textbox", { name: "Filter table rows" }).fill("");
+  const event = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export table as CSV", exact: true })
+    .click();
+  const downloaded = await event;
+  expect(downloaded.suggestedFilename()).toBe("table.csv");
+  const stream = await downloaded.createReadStream();
+  const parts: Buffer[] = [];
+  for await (const part of stream!) parts.push(Buffer.from(part));
+  expect(Buffer.concat(parts).toString()).toContain("'=");
+  await page.getByRole("button", { name: "Source view", exact: true }).click();
+  await expect(page.locator(".cm-content")).toContainText("| Zebra | 12 |");
+  const source = await page.locator(".cm-content").innerText();
+  expect(source.indexOf("Zebra")).toBeLessThan(source.indexOf("Alpha"));
+});

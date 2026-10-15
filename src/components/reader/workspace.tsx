@@ -51,6 +51,7 @@ import { Button } from "@/components/ui/button";
 import { FileTree } from "./file-tree";
 import { Modal } from "./modal";
 import { Markdown } from "./markdown";
+import { useLocalSearch } from "@/hooks/use-local-search";
 import { useReader } from "@/lib/store";
 import { storage } from "@/lib/storage";
 import { exampleDocuments } from "@/lib/examples";
@@ -488,7 +489,12 @@ export default function Workspace() {
         ),
     [documents, collection, fileFilter],
   );
+  const searchIds = useLocalSearch(documents, query);
   const results = useMemo(() => {
+    if (searchIds)
+      return searchIds
+        .map((id) => documents.find((d) => d.id === id))
+        .filter((d): d is ReaderDocument => !!d);
     const tokens = query.toLowerCase().match(/(?:[^\s"]+|"[^"]*")+/g) || [];
     return documents
       .filter((d) =>
@@ -509,7 +515,7 @@ export default function Workspace() {
         }),
       )
       .slice(0, 40);
-  }, [documents, query]);
+  }, [documents, query, searchIds]);
   const backlinks = useMemo(
     () =>
       doc

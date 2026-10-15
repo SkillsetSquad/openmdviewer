@@ -66,3 +66,51 @@ describe("local document utilities", () => {
     expect(analyze(a, [a, b])).toEqual([]);
   });
 });
+
+import { LocalSearch } from "../src/lib/search";
+describe("incremental local search", () => {
+  it("indexes changes, supports fuzzy text and combined filters, and removes old records", () => {
+    const index = new LocalSearch();
+    index.sync(
+      [
+        {
+          id: "a",
+          path: "Docs/Setup.md",
+          content: "Configure a local browser workspace",
+          title: "Configuration",
+          tags: ["guide"],
+          headings: "Local setup",
+        },
+        {
+          id: "b",
+          path: "Notes/A.md",
+          content: "Reading list",
+          title: "Notes",
+          tags: [],
+          headings: "",
+        },
+      ],
+      [],
+    );
+    expect(index.search("configuraton")).toContain("a");
+    expect(
+      index.search('tag:guide path:docs heading:setup "local browser"'),
+    ).toEqual(["a"]);
+    expect(index.search("tag:missing")).toEqual([]);
+    index.sync(
+      [
+        {
+          id: "a",
+          path: "Docs/Setup.md",
+          content: "Rewritten",
+          title: "Changed",
+          tags: [],
+          headings: "",
+        },
+      ],
+      ["b"],
+    );
+    expect(index.search("workspace")).toEqual([]);
+    expect(index.search("")).toEqual(["a"]);
+  });
+});
