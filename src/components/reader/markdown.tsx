@@ -12,6 +12,8 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import rehypeKatex from "rehype-katex";
+import { rehypeMathTools, rehypeMathErrors } from "@/lib/math-tools";
+import { MathExpression } from "./math-expression";
 import { Info, Lightbulb, ShieldAlert } from "lucide-react";
 import { InteractiveTable } from "./interactive-table";
 import { CodeBlock } from "./code-block";
@@ -31,6 +33,22 @@ const Diagram = lazy(() => import("./diagram"));
 const TableRenderer: Components["table"] = ({ children }) => (
   <InteractiveTable>{children}</InteractiveTable>
 );
+
+const SpanRenderer: Components["span"] = ({ node, children, ...props }) => {
+  if (typeof node?.properties.dataMathSource === "string")
+    return (
+      <MathExpression
+        key={node.properties.dataMathSource}
+        source={node.properties.dataMathSource}
+        display={!!node.properties.dataMathDisplay}
+        limited={!!node.properties.dataMathLimited}
+        error={String(node.properties.dataMathError || "")}
+      >
+        {children}
+      </MathExpression>
+    );
+  return <span {...props}>{children}</span>;
+};
 
 const PreRenderer: Components["pre"] = ({ children }) => <>{children}</>;
 const CodeRenderer: Components["code"] = ({ className, children, node }) => {
@@ -81,6 +99,7 @@ export const Markdown = memo(function Markdown({
       />
     ),
     pre: PreRenderer,
+    span: SpanRenderer,
     code: CodeRenderer,
     a: ({ href, children }) => (
       <a
@@ -153,7 +172,12 @@ export const Markdown = memo(function Markdown({
             rehypeRepairAnchors,
             [rehypeSlug, { prefix: "user-content-" }],
             rehypeHeadingAliases,
-            [rehypeKatex, { strict: "warn", trust: false }],
+            rehypeMathTools,
+            [
+              rehypeKatex,
+              { strict: "warn", trust: false, maxExpand: 1000, maxSize: 20 },
+            ],
+            rehypeMathErrors,
           ]}
           components={components}
           urlTransform={(url) =>

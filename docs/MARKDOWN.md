@@ -75,3 +75,7 @@ Code, math, link destinations, URL display text, image alt text, raw HTML, and f
 HTML export uses the same sanitized Markdown extensions, definition lists, emoji, callout labels, and safe heading anchors. Frontmatter is excluded from the document body. Sanitized raw HTML tables remain tables.
 
 Images, audio, video, and their sources become text references; exported HTML does not embed or automatically fetch media. Workspace wiki references retain their labels without a navigation target. The standalone file does not include interactive reader tools, syntax highlighting, or rendered math/diagrams. Use browser print / Save as PDF for the rendered reading view, or workspace ZIP export to preserve source documents and local assets together.
+
+## Equations
+
+See [equation tools](MATH.md) for inline/display LaTeX, MathML accessibility, explicit tags, source inspection, clipboard fallback, and rendering limits.

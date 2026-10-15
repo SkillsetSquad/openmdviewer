@@ -4084,3 +4084,117 @@ kbd {
 .markdown-body dd > p:last-child {
   margin-bottom: 0;
 }
+
+.reader-math {
+  position: relative;
+  max-width: 100%;
+}
+.reader-math-display {
+  display: block;
+  margin: 1em 0;
+  padding: 0.5em 0.75em;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.math-rendered {
+  min-width: 0;
+}
+.reader-math-display > .math-rendered {
+  display: block;
+  overflow-x: auto;
+}
+.reader-math-display .katex-display {
+  margin: 0.65em 0;
+}
+.math-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: 4px;
+  vertical-align: middle;
+}
+.reader-math-display > .math-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0;
+}
+.math-tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.math-tools button:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.math-tools button:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+.math-source-panel:not([hidden]) {
+  display: block;
+  margin: 8px 0;
+}
+.math-source-panel label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+.math-source-panel textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--background);
+  color: var(--foreground);
+  font:
+    12px/1.6 var(--font-mono),
+    monospace;
+}
+.math-feedback {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 4px;
+}
+.math-rendered-limited {
+  display: block;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.6 monospace;
+}
+@media print {
+  .reader-math-display {
+    border: 0;
+    padding: 0;
+  }
+  .math-tools,
+  .math-source-panel,
+  .math-feedback {
+    display: none !important;
+  }
+  .reader-math-display > .math-rendered {
+    overflow: visible;
+  }
+}
+.math-invalid-source {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.6 monospace;
+}
+.math-error {
+  overflow-wrap: anywhere;
+}
