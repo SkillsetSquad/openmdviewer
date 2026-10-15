@@ -189,3 +189,58 @@ it("keeps directory connection tokens and workspace records atomic through the s
   expect((await storage.directorySource("folder"))?.token).toBe("one");
   storage.close();
 });
+
+it("migrates legacy Blob and byte records without creating native Blob files or rewriting the original asset store", async () => {
+  const name = `asset-test-${crypto.randomUUID()}`;
+  names.push(name);
+  const legacy = new Dexie(name);
+  legacy
+    .version(2)
+    .stores({ documents: "id, path, updatedAt, favorite", assets: "path" });
+  const blob = asset(),
+    buffer = {
+      ...asset(),
+      path: "second.png",
+      blob: await asset().blob.arrayBuffer(),
+    };
+  await legacy
+    .table("documents")
+    .put(newDocument("Legacy.md", "# Keep legacy"));
+  await legacy.table("assets").bulkPut([blob, buffer]);
+  legacy.close();
+  const original = IDBObjectStore.prototype.put;
+  vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+    this: IDBObjectStore,
+    value,
+    key,
+  ) {
+    if (this.name === "workspaceAssets" && value.blob instanceof Blob)
+      throw new DOMException(
+        "Error preparing Blob/File data to be stored in object store",
+        "UnknownError",
+      );
+    return key === undefined
+      ? original.call(this, value)
+      : original.call(this, value, key);
+  });
+  const storage = createStorage(name);
+  await storage.initialize([]);
+  expect((await storage.load())[0].content).toBe("# Keep legacy");
+  const assets = await storage.loadAssets();
+  expect(assets).toHaveLength(2);
+  for (const item of assets)
+    expect(await item.blob.arrayBuffer()).toEqual(
+      await blob.blob.arrayBuffer(),
+    );
+  const raw = new Dexie(name);
+  await raw.open();
+  expect((await raw.table("assets").get(blob.path)).blob).toBeInstanceOf(Blob);
+  expect((await raw.table("assets").get(buffer.path)).blob).toBeInstanceOf(
+    ArrayBuffer,
+  );
+  expect(
+    (await raw.table("workspaceAssets").get(["default", blob.path])).blob,
+  ).toBeInstanceOf(ArrayBuffer);
+  raw.close();
+  storage.close();
+});

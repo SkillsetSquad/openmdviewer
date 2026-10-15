@@ -5,11 +5,18 @@ export type StoredAsset = Omit<ReaderAsset, "blob"> & {
   blob: Blob | ArrayBuffer;
 };
 export async function assetBytes(
-  assets: ReaderAsset[],
+  assets: StoredAsset[],
 ): Promise<StoredAsset[]> {
   const records: StoredAsset[] = [];
-  for (const asset of assets)
-    records.push({ ...asset, blob: await asset.blob.arrayBuffer() });
+  for (const asset of assets) {
+    if (asset.blob instanceof ArrayBuffer) records.push(asset);
+    else if (asset.blob instanceof Blob)
+      records.push({ ...asset, blob: await asset.blob.arrayBuffer() });
+    else
+      throw new Error(
+        "A stored asset has an unsupported binary format. Its record has been preserved.",
+      );
+  }
   return records;
 }
 export function restoredAsset(asset: StoredAsset): ReaderAsset {

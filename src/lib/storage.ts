@@ -72,9 +72,14 @@ export function createStorage(name = "openmdviewer") {
           d.revision = 0;
         });
       const assets = await tx.table("assets").toArray();
-      await tx
-        .table("workspaceAssets")
-        .bulkPut(assets.map((a) => ({ ...a, workspaceId: "default" })));
+      // Preserve original legacy records; move readable payloads through bytes so
+      // an upgrade does not require the engine to prepare new native Blob files.
+      for (const asset of assets) {
+        const [record] = await Dexie.waitFor(assetBytes([asset]));
+        await tx
+          .table("workspaceAssets")
+          .put({ ...record, workspaceId: "default" });
+      }
       await tx.table("workspaces").put({
         ...defaultWorkspace(),
         initialized: (await tx.table("documents").count()) > 0,

@@ -1,5 +1,18 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+
+async function replaceEditor(page: Page, content: string) {
+  const editor = page.locator(".cm-content");
+  await editor.click();
+  await editor.press("ControlOrMeta+a");
+  await editor.press("Backspace");
+  const lines = content.split("\n");
+  for (const [index, line] of lines.entries()) {
+    if (index) await editor.press("Enter");
+    if (line) await editor.pressSequentially(line);
+  }
+  await expect(editor.locator(".cm-line")).toHaveText(lines);
+}
 
 test("reference layout renders locally, navigates, and changes themes", async ({
   page,
@@ -56,9 +69,7 @@ test("imports untrusted Markdown safely, persists edits, and exports", async ({
   await expect(page.locator("article script")).toHaveCount(0);
   await page.getByRole("button", { name: "Split view", exact: true }).click();
   await expect(page.locator(".cm-content")).toBeVisible();
-  await page
-    .locator(".cm-content")
-    .fill("# Edited locally\n\nThis is my local document.");
+  await replaceEditor(page, "# Edited locally\n\nThis is my local document.");
   await expect(
     page.getByRole("heading", { name: "Edited locally" }),
   ).toBeVisible();
@@ -357,9 +368,10 @@ test("creates independent workspaces and remembers the selected project", async 
     .last()
     .click();
   await expect(page.locator(".cm-content")).toBeVisible();
-  await page
-    .locator(".cm-content")
-    .fill("# Private project note\n\nOnly in this workspace.");
+  await replaceEditor(
+    page,
+    "# Private project note\n\nOnly in this workspace.",
+  );
   await expect(
     page.locator(".bottom-status").getByText("Saved in this browser"),
   ).toBeVisible();
@@ -400,9 +412,7 @@ test("restores a revision and recovers deleted documents from trash", async ({
       buffer: Buffer.from("# Original revision\n\nKeep me safe."),
     });
   await page.getByRole("button", { name: "Split view", exact: true }).click();
-  await page
-    .locator(".cm-content")
-    .fill("# New revision\n\nAn edited version.");
+  await replaceEditor(page, "# New revision\n\nAn edited version.");
   await expect(
     page.getByRole("heading", { name: "New revision", exact: true }),
   ).toBeVisible();
@@ -471,12 +481,12 @@ test("detects edits from another tab and preserves both versions on request", as
     second.getByRole("heading", { name: "Shared original" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Split view", exact: true }).click();
-  await page.locator(".cm-content").fill("# First tab version");
+  await replaceEditor(page, "# First tab version");
   await expect(
     page.locator(".bottom-status").getByText("Saved in this browser"),
   ).toBeVisible();
   await second.getByRole("button", { name: "Split view", exact: true }).click();
-  await second.locator(".cm-content").fill("# Second tab version");
+  await replaceEditor(second, "# Second tab version");
   await expect(
     second.getByRole("dialog", {
       name: "This document changed in another tab",
@@ -502,66 +512,116 @@ test("detects edits from another tab and preserves both versions on request", as
   await second.close();
 });
 
-test("migrates an existing browser database and preserves local media", async ({
-  page,
-}) => {
-  await page.goto("icon.svg");
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open("openmdviewer", 20);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        const docs = db.createObjectStore("documents", { keyPath: "id" });
-        for (const index of ["path", "updatedAt", "favorite"])
-          docs.createIndex(index, index);
-        db.createObjectStore("assets", { keyPath: "path" });
-      };
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(["documents", "assets"], "readwrite");
-        tx.objectStore("documents").put({
-          id: "legacy",
-          path: "Docs/Legacy.md",
-          content: "# Legacy document\n\n![Legacy image](photo.png)",
-          tags: ["legacy"],
-          favorite: true,
-          scroll: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        });
-        const bytes = Uint8Array.from(
-          atob(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
-          ),
-          (c) => c.charCodeAt(0),
-        );
-        tx.objectStore("assets").put({
-          path: "Docs/photo.png",
-          blob: new Blob([bytes], { type: "image/png" }),
-          type: "image/png",
-        });
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
+for (const format of ["blob", "bytes"] as const)
+  test(`migrates an existing browser database and preserves local media (${format})`, async ({
+    page,
+  }, testInfo) => {
+    await page.goto("icon.svg");
+    const setup = await page.evaluate(async (format) => {
+      return new Promise<{ error?: string }>((resolve, reject) => {
+        const request = indexedDB.open("openmdviewer", 20);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          const docs = db.createObjectStore("documents", { keyPath: "id" });
+          for (const index of ["path", "updatedAt", "favorite"])
+            docs.createIndex(index, index);
+          db.createObjectStore("assets", { keyPath: "path" });
         };
-        tx.onerror = () => reject(tx.error);
-      };
-    });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction(["documents", "assets"], "readwrite");
+          tx.objectStore("documents").put({
+            id: "legacy",
+            path: "Docs/Legacy.md",
+            content: "# Legacy document\n\n![Legacy image](photo.png)",
+            tags: ["legacy"],
+            favorite: true,
+            scroll: 0,
+            createdAt: 1,
+            updatedAt: 1,
+          });
+          const bytes = Uint8Array.from(
+            atob(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
+            ),
+            (c) => c.charCodeAt(0),
+          );
+          tx.objectStore("assets").put({
+            path: "Docs/photo.png",
+            blob:
+              format === "blob"
+                ? new Blob([bytes], { type: "image/png" })
+                : bytes.buffer,
+            type: "image/png",
+          });
+          tx.oncomplete = () => {
+            db.close();
+            resolve({});
+          };
+          tx.onerror = (event) => {
+            const error =
+              (event.target as IDBRequest).error?.message ||
+              tx.error?.message ||
+              "Legacy fixture write failed.";
+            try {
+              tx.abort();
+            } catch {}
+            db.close();
+            resolve({ error });
+          };
+          tx.onabort = () => {
+            const error =
+              tx.error?.message || "Legacy fixture transaction aborted.";
+            db.close();
+            resolve({ error });
+          };
+        };
+      });
+    }, format);
+    if (setup.error) {
+      const nativeBlobUnavailable =
+        format === "blob" &&
+        setup.error.includes(
+          "Error preparing Blob/File data to be stored in object store",
+        );
+      testInfo.annotations.push({
+        type: "legacy-fixture-error",
+        description: setup.error,
+      });
+      test.skip(
+        nativeBlobUnavailable,
+        "This engine cannot seed native Blob records; the separate byte-format migration case remains required.",
+      );
+      throw new Error(setup.error);
+    }
+    await page.goto("./");
+    await expect(
+      page.getByRole("heading", { name: "Legacy document" }),
+    ).toBeVisible();
+    await expect(page.getByText("1 documents, all local")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Enlarge image: Legacy image" }),
+    ).toHaveAttribute("src", /^blob:/);
+    const mediaBytes = await page
+      .getByRole("button", { name: "Enlarge image: Legacy image" })
+      .evaluate(async (element) =>
+        Array.from(
+          new Uint8Array(
+            await (
+              await fetch((element as HTMLImageElement).src)
+            ).arrayBuffer(),
+          ),
+        ),
+      );
+    expect(Buffer.from(mediaBytes).toString("base64")).toBe(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==",
+    );
+    await page.getByRole("button", { name: "Favorites", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Legacy.md", exact: true }),
+    ).toBeVisible();
   });
-  await page.goto("./");
-  await expect(
-    page.getByRole("heading", { name: "Legacy document" }),
-  ).toBeVisible();
-  await expect(page.getByText("1 documents, all local")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Enlarge image: Legacy image" }),
-  ).toHaveAttribute("src", /^blob:/);
-  await page.getByRole("button", { name: "Favorites", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Legacy.md", exact: true }),
-  ).toBeVisible();
-});
 
 test("applies an application update after preserving pending edits", async ({
   page,
@@ -610,9 +670,10 @@ test("applies an application update after preserving pending edits", async ({
         exact: true,
       }),
     ).toBeVisible({ timeout: 30000 });
-    await page
-      .locator(".cm-content")
-      .fill("# Preserved through update\n\nDo not lose this edit.");
+    await replaceEditor(
+      page,
+      "# Preserved through update\n\nDo not lose this edit.",
+    );
     await Promise.all([
       page.waitForEvent("load"),
       page
