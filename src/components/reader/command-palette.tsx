@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   BookOpen,
+  StickyNote,
   ChevronRight,
   CircleHelp,
   Copy,
@@ -49,6 +50,7 @@ const icons = {
   backlinks: Link2,
   analyze: ShieldCheck,
   properties: Info,
+  notes: StickyNote,
   history: History,
   copy: Copy,
   exportMarkdown: ArrowDownToLine,

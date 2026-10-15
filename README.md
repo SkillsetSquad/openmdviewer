@@ -2,7 +2,7 @@
 
 **Your words. Your space.** A free, open-source Markdown reader and local knowledge workspace by SkillsetSquad. A compact, three-pane interface with a file tree, a focused reading surface, and contextual document navigation.
 
-[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Tables](docs/TABLES.md) · [Images](docs/IMAGES.md) · [Audio/video](docs/MEDIA.md) · [Contributor instructions](AGENTS.md)
+[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Tables](docs/TABLES.md) · [Images](docs/IMAGES.md) · [Audio/video](docs/MEDIA.md) · [Notes/bookmarks](docs/ANNOTATIONS.md) · [Contributor instructions](AGENTS.md)
 
 ## Run locally
 
@@ -26,6 +26,7 @@ The `out/` directory is the entire application. No application server, accounts,
 
 - Responsive dark reader inspired by the supplied design: collapsible file tree, breadcrumbs, document tabs, reading toolbar, contents, properties, tags, actions, backlinks, and an interactive workspace graph with search, tag/connection filters, neighborhood exploration, zoom/pan, and an accessible document list.
 - CommonMark/GFM, YAML/TOML/JSON frontmatter, wiki/reference links, safe heading and footnote navigation, sortable tables with whole-table and column filters, cell/row copying, CSV/JSON export, resizing, pagination, numeric summaries, and full-viewport viewing, task lists, footnotes, sanitized HTML, KaTeX, lazy Shiki highlighting with line numbers/copy/download/folding, strict Mermaid diagrams with zoom/source/SVG export.
+- Personal notes, prose highlights, and heading bookmarks with workspace-wide search, conservative passage relocation, JSON export, and ZIP backup/restore. Reading data is stored separately from Markdown source.
 - Native local audio/video playback with speed, WebVTT captions, measured duration/dimensions, original downloads, browser-supported fullscreen/picture-in-picture, and separate remote-media/poster/caption consent.
 - Full-viewport image gallery with zoom/pan, keyboard navigation, local dimensions/type/byte size, original downloads, PNG clipboard copying, and individual remote-image consent.
 - Local Markdown/text/MDX and media imports, folder selection, ZIP imports with size limits, duplicate-path protection, drag and drop, document creation and path renaming.
@@ -40,7 +41,7 @@ Remote Markdown images, audio, video, posters, and captions are blocked until in
 
 ## Roadmap and current boundaries
 
-The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. OPFS/direct filesystem writing, richer format conversion, repository browsing, browser AI, encryption, annotations, lifecycle workflows, and workspace publishing remain future work. No placeholder buttons advertise these features.
+The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. OPFS/direct filesystem writing, richer format conversion, repository browsing, browser AI, encryption, lifecycle workflows, and workspace publishing remain future work. No placeholder buttons advertise these features.
 
 Core browser flows have automated Chromium coverage. Firefox, Safari, large-workspace benchmarks, and complete WCAG 2.2 AA conformance have not yet been certified. Folder selection depends on browser support; individual files and ZIP provide portable alternatives. Imported images and media are stored with their relative paths in IndexedDB and included in workspace ZIP exports. Image rendering is local; arbitrary active media is never executed.
 

@@ -112,3 +112,29 @@ it("retains the newest 50 revisions even when timestamps are identical", async (
     storage.close();
   }
 });
+
+it("preserves personal reading data across content edits, trash recovery and revision conflicts", async () => {
+  const { storage } = make();
+  await storage.initialize([]);
+  const doc = await storage.put(newDocument("Reading.md", "# Reading"));
+  const item = {
+    id: "local-note",
+    kind: "note" as const,
+    title: "Note",
+    note: "Private",
+    createdAt: 1000,
+    updatedAt: 1000,
+  };
+  const noted = await storage.save({ ...doc, annotations: [item] }, 0);
+  const edited = await storage.save({ ...noted, content: "# Updated" }, 1);
+  await expect(
+    storage.save({ ...noted, annotations: [] }, 1),
+  ).rejects.toBeInstanceOf(DocumentConflict);
+  expect((await storage.get(doc.id))?.annotations).toEqual([item]);
+  await storage.trash(edited, 2);
+  expect((await storage.restoreTrash(doc.id)).annotations).toEqual([item]);
+  expect((await storage.snapshots(doc.id))[0].document.annotations).toEqual([
+    item,
+  ]);
+  storage.close();
+});

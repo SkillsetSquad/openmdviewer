@@ -29,6 +29,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link
+          rel="stylesheet"
+          href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/reading-highlights.css`}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

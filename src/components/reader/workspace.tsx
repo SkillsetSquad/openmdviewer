@@ -17,6 +17,7 @@ import {
   ArrowDownToLine,
   ArrowLeft,
   BookOpen,
+  StickyNote,
   CheckCheck,
   ChevronRight,
   CircleHelp,
@@ -55,6 +56,9 @@ import { FileTree } from "./file-tree";
 import { DocumentTabs, documentTabId } from "./document-tabs";
 import { Modal } from "./modal";
 import { Markdown } from "./markdown";
+import { useAnnotations } from "@/hooks/use-annotations";
+import { captureQuote, locateQuote, readingText } from "@/lib/annotation-dom";
+import { parseAnnotations, annotationExport } from "@/lib/annotations";
 import { useLocalSearch } from "@/hooks/use-local-search";
 import { useAppUpdates } from "@/hooks/use-app-updates";
 import { useWorkspaceSession } from "@/hooks/use-workspace-session";
@@ -78,7 +82,13 @@ import {
   stats,
   supportedFile,
 } from "@/lib/documents";
-import type { ReaderDocument, ReaderTheme } from "@/lib/types";
+import type {
+  ReaderDocument,
+  ReaderTheme,
+  ReaderAnnotation,
+  TextQuote,
+} from "@/lib/types";
+const Annotations = lazy(() => import("./annotations"));
 const CommandPalette = lazy(() => import("./command-palette"));
 const WorkspaceGraph = lazy(() => import("./workspace-graph"));
 const Insights = lazy(() => import("./insights"));
@@ -94,6 +104,7 @@ type DialogName =
   | "analyze"
   | "health"
   | "graph"
+  | "notes"
   | "properties"
   | "help"
   | "workspaces"
@@ -188,6 +199,91 @@ export default function Workspace() {
   const filesRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const doc = documents.find((d) => d.id === activeId);
+  const [selectedPassage, setSelectedPassage] = useState<TextQuote>();
+  const [pendingReadingItem, setPendingReadingItem] = useState<{
+    documentId: string;
+    item: ReaderAnnotation;
+  } | null>(null);
+  const annotationLocations = useAnnotations(
+    articleRef,
+    doc?.annotations,
+    doc?.content || "",
+    mode !== "source",
+    activeId,
+  );
+  function openNotes() {
+    setSelectedPassage(
+      articleRef.current
+        ? captureQuote(articleRef.current, window.getSelection())
+        : undefined,
+    );
+    setDialog("notes");
+  }
+  async function saveReadingItems(
+    documentId: string,
+    items: ReaderAnnotation[],
+  ) {
+    if (!(await flushEdit())) return false;
+    const current = useReader
+      .getState()
+      .documents.find((d) => d.id === documentId);
+    if (!current) throw new Error("This document is no longer available.");
+    const annotations = parseAnnotations(items);
+    const ok = await save({ ...current, annotations });
+    if (ok)
+      useReader.setState((state) => ({
+        documents: state.documents.map((d) =>
+          d.id === documentId ? { ...d, annotations } : d,
+        ),
+      }));
+    return ok;
+  }
+  useEffect(() => {
+    if (
+      !pendingReadingItem ||
+      pendingReadingItem.documentId !== activeId ||
+      mode === "source"
+    )
+      return;
+    const frame = requestAnimationFrame(() => {
+      const root = articleRef.current;
+      if (!root) return;
+      const item = pendingReadingItem.item;
+      if (item.quote) {
+        const match = locateQuote(readingText(root), item.quote);
+        if (match.range) {
+          root.focus({ preventScroll: true });
+          match.range.startContainer.parentElement?.scrollIntoView({
+            block: "center",
+            behavior: "smooth",
+          });
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(match.range);
+        } else
+          notify(
+            match.status === "ambiguous"
+              ? "Several passages match this saved quote. Its location is uncertain."
+              : "The saved passage is no longer found. Your note and original quote are preserved.",
+          );
+      } else {
+        const heading = item.heading
+          ? Array.from(root.querySelectorAll<HTMLElement>("[id]")).find(
+              (element) => element.id === item.heading,
+            )
+          : root;
+        if (heading) {
+          root.focus({ preventScroll: true });
+          heading.scrollIntoView({ block: "start", behavior: "smooth" });
+        } else
+          notify(
+            "That bookmarked section is no longer found. The bookmark is preserved.",
+          );
+      }
+      setPendingReadingItem(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingReadingItem, activeId, mode, notify]);
   const effectiveTags = useMemo(() => (doc ? documentTags(doc) : []), [doc]);
   const outline = useMemo(() => headings(doc?.content || ""), [doc?.content]);
   const metadata = useMemo(() => stats(doc?.content || ""), [doc?.content]);
@@ -536,6 +632,9 @@ export default function Workspace() {
             setDialog("analyze");
           }
           break;
+        case "notes":
+          if (doc) openNotes();
+          break;
         case "properties":
           if (doc) setDialog("properties");
           break;
@@ -710,7 +809,7 @@ export default function Workspace() {
         type="file"
         aria-label="Import Markdown files"
         multiple
-        accept=".md,.markdown,.mdown,.mkd,.mdx,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.avif,.pdf,.mp3,.wav,.mp4,.webm,.ogg"
+        accept=".md,.markdown,.mdown,.mkd,.mdx,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.avif,.pdf,.mp3,.wav,.mp4,.webm,.ogg,.m4a,.aac,.flac,.opus,.ogv,.vtt"
         ref={filesRef}
         onChange={fileInput}
       />
@@ -1158,6 +1257,12 @@ export default function Workspace() {
                         />
                       </IconButton>
                       <IconButton
+                        label="Notes and bookmarks"
+                        onClick={openNotes}
+                      >
+                        <StickyNote size={15} />
+                      </IconButton>
+                      <IconButton
                         label="Rename document"
                         onClick={() => {
                           setFormValue(doc.path);
@@ -1546,6 +1651,13 @@ export default function Workspace() {
                     <FileText size={14} />
                     {mode === "source" ? "Reading view" : "Open raw file"}
                     <Code2 size={13} />
+                  </button>
+                  <button onClick={openNotes}>
+                    <StickyNote size={14} />
+                    Notes and bookmarks
+                    {doc.annotations?.length ? (
+                      <span>{doc.annotations.length}</span>
+                    ) : null}
                   </button>
                   <button onClick={() => setDialog("export")}>
                     <ArrowDownToLine size={14} />
@@ -2066,6 +2178,32 @@ export default function Workspace() {
           />
         </Suspense>
       )}
+      {dialog === "notes" && doc && (
+        <Suspense
+          fallback={
+            <Modal title="Notes and bookmarks" onClose={() => setDialog(null)}>
+              <p className="empty-panel">Loading reading tools…</p>
+            </Modal>
+          }
+        >
+          <Annotations
+            key={doc.id}
+            doc={doc}
+            documents={documents}
+            selection={selectedPassage}
+            locations={annotationLocations}
+            currentHeading={activeHeading}
+            onClose={() => setDialog(null)}
+            onSave={saveReadingItems}
+            onNavigate={(documentId, item) => {
+              setDialog(null);
+              setMode("read");
+              openDocument(documentId);
+              setPendingReadingItem({ documentId, item });
+            }}
+          />
+        </Suspense>
+      )}
       {dialog === "properties" && doc && (
         <Suspense
           fallback={
@@ -2169,6 +2307,20 @@ export default function Workspace() {
             >
               Download my edits
             </Button>
+            {!!conflict.local.annotations?.length && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  download(
+                    "openmdviewer-pending-annotations.json",
+                    annotationExport([conflict.local]),
+                    "application/json",
+                  )
+                }
+              >
+                Download pending reading data
+              </Button>
+            )}
             <Button
               variant="outline"
               disabled={resolvingConflict}

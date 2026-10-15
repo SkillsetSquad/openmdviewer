@@ -278,6 +278,12 @@ export function useWorkspaceSession(notify: (message: string) => void) {
             .getState()
             .documents.find((d) => d.id === conflict.local.id) ||
           conflict.local;
+        // Content may have advanced optimistically while a reading-data save failed.
+        // The conflict retains the exact annotations submitted by that failed write.
+        const preservedLocal = {
+          ...local,
+          annotations: conflict.local.annotations,
+        };
         const current = await storage.get(conflict.current.id);
         if (!current) {
           notify(
@@ -302,9 +308,10 @@ export function useWorkspaceSession(notify: (message: string) => void) {
               ` (conflict copy ${++n})$1`,
             );
           copy = await storage.put({
-            ...newDocument(path, local.content),
+            ...newDocument(path, preservedLocal.content),
             workspaceId: local.workspaceId,
             tags: local.tags,
+            annotations: preservedLocal.annotations,
           });
         }
         revisions.current.set(current.id, current.revision || 0);

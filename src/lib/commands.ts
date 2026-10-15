@@ -95,6 +95,12 @@ export const commands = [
     document: true,
   },
   {
+    id: "notes",
+    label: "Notes and bookmarks",
+    keywords: "annotations highlights passages personal reading",
+    document: true,
+  },
+  {
     id: "properties",
     label: "Document properties",
     keywords: "metadata frontmatter statistics words owner",

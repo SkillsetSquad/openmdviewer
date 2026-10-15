@@ -1,0 +1,12 @@
+/* Native highlight selectors bypass the bundled CSS optimizer, which does not yet recognize this browser API. This file is self-hosted and precached. */
+::highlight(reader-notes) {
+  background-color: #f6c55c66;
+  color: inherit;
+  text-decoration: underline #dba436;
+}
+@media print {
+  ::highlight(reader-notes) {
+    background-color: transparent;
+    text-decoration: none;
+  }
+}

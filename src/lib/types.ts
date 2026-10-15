@@ -10,6 +10,7 @@ export interface ReaderDocument {
   tags: string[];
   favorite: boolean;
   scroll: number;
+  annotations?: ReaderAnnotation[];
 }
 export type ReadingMode = "read" | "split" | "source";
 export type ReaderTheme =
@@ -58,4 +59,21 @@ export interface SourceReference {
   line: number;
   image: boolean;
   alt?: string;
+}
+
+export interface TextQuote {
+  exact: string;
+  prefix: string;
+  suffix: string;
+  start: number;
+}
+export interface ReaderAnnotation {
+  id: string;
+  kind: "bookmark" | "highlight" | "note";
+  title: string;
+  note: string;
+  heading?: string;
+  quote?: TextQuote;
+  createdAt: number;
+  updatedAt: number;
 }
