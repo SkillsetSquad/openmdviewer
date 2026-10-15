@@ -61,3 +61,20 @@ it("rejects a late result even before a throttled timeout callback executes", as
   await expect(result).rejects.toThrow("45-second");
   expect(worker.terminate).toHaveBeenCalledOnce();
 });
+
+it("returns a typed local PDF password request and releases the current worker", async () => {
+  const result = convertInWorker([], new AbortController().signal, () => {}),
+    worker = ControlledWorker.latest;
+  worker.emit({ type: "ready" });
+  worker.emit({
+    type: "password",
+    sourcePath: "Imported/locked.pdf",
+    incorrect: true,
+  });
+  await expect(result).rejects.toMatchObject({
+    name: "ConversionPasswordError",
+    sourcePath: "Imported/locked.pdf",
+    incorrect: true,
+  });
+  expect(worker.terminate).toHaveBeenCalledOnce();
+});

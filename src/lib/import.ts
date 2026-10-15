@@ -29,9 +29,11 @@ export const mediaType = (name: string) =>
   mediaTypes[name.split(".").pop()?.toLowerCase() || ""];
 // Source attachments must download as bytes rather than becoming executable same-origin HTML blobs.
 export const sourceAssetType = (name: string) =>
-  /\.(html?|docx)$/i.test(name) ? "application/octet-stream" : "";
+  /\.(html?|docx)$/i.test(name) || /(?:^|\/)_sources\/[^/]+\.pdf$/i.test(name)
+    ? "application/octet-stream"
+    : "";
 export const attachmentType = (name: string) =>
-  mediaType(name) || sourceAssetType(name);
+  sourceAssetType(name) || mediaType(name);
 export function isolateImport(
   documents: ReaderDocument[],
   assets: ReaderAsset[],

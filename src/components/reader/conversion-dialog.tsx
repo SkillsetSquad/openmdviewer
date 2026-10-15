@@ -2,9 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "./modal";
 import { convertInWorker } from "@/lib/conversion-client";
+import { safePath } from "@/lib/paths";
 import { download } from "@/lib/documents";
 import { unicodePrefix } from "@/lib/search-results";
-import type { ConversionInput, ConversionResult } from "@/lib/conversion-types";
+import {
+  ConversionPasswordError,
+  type ConversionInput,
+  type ConversionResult,
+} from "@/lib/conversion-types";
 
 export default function ConversionDialog({
   inputs,
@@ -26,18 +31,34 @@ export default function ConversionDialog({
   const [selected, setSelected] = useState(0),
     [attempt, setAttempt] = useState(0);
   const controller = useRef<AbortController | null>(null);
+  const passwords = useRef(new Map<string, string>());
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const [challenge, setChallenge] = useState<ConversionPasswordError | null>(
+    null,
+  );
+  const [password, setPassword] = useState("");
   useEffect(() => {
     onBusy(true);
     return () => onBusy(false);
   }, [onBusy]);
   const savingRef = useRef(false);
   useEffect(() => {
+    if (challenge && !busy) passwordInput.current?.focus();
+  }, [challenge, busy]);
+  useEffect(() => {
     let current = true;
     const abort = new AbortController();
     controller.current = abort;
-    void convertInWorker(inputs, abort.signal, (value) => {
-      if (current) setMessage(value);
-    })
+    void convertInWorker(
+      inputs.map((input) => ({
+        ...input,
+        password: passwords.current.get(safePath(input.path)),
+      })),
+      abort.signal,
+      (value) => {
+        if (current) setMessage(value);
+      },
+    )
       .then((value) => {
         if (current) {
           setResult(value);
@@ -45,12 +66,19 @@ export default function ConversionDialog({
         }
       })
       .catch((error) => {
-        if (current)
+        if (current) {
+          if (error instanceof ConversionPasswordError) {
+            setChallenge(error);
+            setPassword("");
+            setMessage(error.message);
+            return;
+          }
           setMessage(
             error instanceof Error && error.name === "AbortError"
               ? "Conversion canceled. No documents were imported."
               : `Conversion failed: ${error instanceof Error ? error.message : "Worker unavailable."}`,
           );
+        }
       })
       .finally(() => {
         if (current) setBusy(false);
@@ -72,9 +100,9 @@ export default function ConversionDialog({
     >
       <div className="conversion-body" aria-busy={busy || saving}>
         <p>
-          Convert HTML and DOCX locally to Markdown. Review the result, then
-          import it into <strong>{workspaceName}</strong>. Original files and
-          embedded images stay alongside the browser copy.
+          Convert HTML, DOCX and PDF locally to Markdown. Review the result,
+          then import it into <strong>{workspaceName}</strong>. Original files
+          and embedded images stay alongside the browser copy.
         </p>
         <p role="status">{message}</p>
         {busy && (
@@ -82,7 +110,44 @@ export default function ConversionDialog({
             Cancel conversion
           </button>
         )}
-        {!busy && !result && (
+        {!busy && challenge && (
+          <form
+            className="pdf-password-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!password || busy) return;
+              passwords.current.set(challenge.sourcePath, password);
+              setPassword("");
+              setChallenge(null);
+              setBusy(true);
+              setMessage("Opening PDF locally…");
+              setAttempt((value) => value + 1);
+            }}
+          >
+            <p>{challenge.sourcePath}</p>
+            <p>
+              The password is used only for this local conversion. Import stores
+              extracted text unencrypted in this browser; the original PDF stays
+              unchanged.
+            </p>
+            <label>
+              PDF password
+              <input
+                ref={passwordInput}
+                type="password"
+                spellCheck={false}
+                value={password}
+                maxLength={1024}
+                autoComplete="off"
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <button type="submit" disabled={!password}>
+              Unlock PDF locally
+            </button>
+          </form>
+        )}
+        {!busy && !result && !challenge && (
           <button
             type="button"
             onClick={() => {
@@ -142,11 +207,19 @@ export default function ConversionDialog({
                 <p>
                   {report.format} → Markdown ·{" "}
                   {doc.content.length.toLocaleString()} characters ·{" "}
-                  {report.images.toLocaleString()} embedded{" "}
+                  {report.images.toLocaleString()} local{" "}
                   {report.images === 1 ? "image" : "images"} ·{" "}
                   {report.warningCount.toLocaleString()} conversion{" "}
                   {report.warningCount === 1 ? "notice" : "notices"}
                 </p>
+                {report.pdf && (
+                  <p className="pdf-extraction-summary">
+                    {report.pdf.pages} source{" "}
+                    {report.pdf.pages === 1 ? "page" : "pages"} ·{" "}
+                    {report.pdf.textPages} with extractable text ·{" "}
+                    {report.pdf.emptyPages.length} without text
+                  </p>
+                )}
                 {!!report.warnings.length && (
                   <details>
                     <summary>Conversion notices</summary>

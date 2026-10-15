@@ -80,7 +80,7 @@ import {
   workspaceMetadata,
 } from "@/lib/workspace-archive";
 import {
-  convertibleFile,
+  shouldConvertInput,
   type ConversionInput,
   type ConversionResult,
 } from "@/lib/conversion-types";
@@ -679,14 +679,18 @@ export default function Workspace() {
   }
   async function importFiles(files: File[]) {
     if (!files.length) return;
-    if (files.some((file) => convertibleFile(file.name))) {
+    const markdownBundle = files.some((file) => supportedFile(file.name));
+    const inputs: ConversionInput[] = files.map((file) => ({
+      file,
+      path: file.webkitRelativePath || `Imported/${file.name}`,
+      pdfMode:
+        /\.pdf$/i.test(file.name) && markdownBundle ? "attachment" : undefined,
+    }));
+    if (inputs.some(shouldConvertInput)) {
       setConversionRequest({
         id: crypto.randomUUID(),
         workspaceId,
-        inputs: files.map((file) => ({
-          file,
-          path: file.webkitRelativePath || `Imported/${file.name}`,
-        })),
+        inputs,
       });
       setDialog("convertImport");
       return;
@@ -2743,9 +2747,9 @@ export default function Workspace() {
             </p>
           </div>
           <p className="dialog-description">
-            Drop Markdown, HTML, or DOCX files anywhere, or use Open files to
-            import a ZIP. Use Open folder to preserve folder structure. Export
-            regularly: browser data can be cleared by you or the browser.
+            Drop Markdown, HTML, DOCX, or PDF files anywhere, or use Open files
+            to import a ZIP. Use Open folder to preserve folder structure.
+            Export regularly: browser data can be cleared by you or the browser.
           </p>
           <a
             className="github-link"

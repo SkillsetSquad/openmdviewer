@@ -29,6 +29,7 @@ The `out/` directory is the entire application. No application server, accounts,
 - Personal notes, prose highlights, and heading bookmarks with workspace-wide search, conservative passage relocation, JSON export, and ZIP backup/restore. Reading data is stored separately from Markdown source.
 - Native local audio/video playback with speed, WebVTT captions, measured duration/dimensions, original downloads, browser-supported fullscreen/picture-in-picture, and separate remote-media/poster/caption consent.
 - Full-viewport image gallery with zoom/pan, keyboard navigation, local dimensions/type/byte size, original downloads, PNG clipboard copying, and individual remote-image consent.
+- PDF text-layer import with local password retry, page diagnostics, source preservation, page-link navigation and offline character maps; Markdown bundles keep PDFs as attachments. See [PDF import](docs/PDF_IMPORT.md).
 - HTML/DOCX conversion with a cancellable local worker, explicit Markdown preview/import, extracted images, retained originals, and ZIP backup support. See [document conversion](docs/CONVERSION.md).
 - Local Markdown/text/MDX and media imports, folder selection, ZIP imports with size limits, duplicate-path protection, drag and drop, document creation and path renaming.
 - Optional native local-file connections with explicit Save / Save As, checksum-checked replacement reviews, reload from disk, persisted browser handles, and portable import/download fallbacks. Browser autosave remains independent. See [support and verification limits](docs/LOCAL_FILES.md).
@@ -43,7 +44,7 @@ Remote Markdown images, audio, video, posters, and captions are blocked until in
 
 ## Roadmap and current boundaries
 
-The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. OPFS workspace storage, physical directory create/rename/move/delete operations, PDF/text extraction and richer format import/export, repository browsing, browser AI, encryption, lifecycle workflows, and workspace publishing remain future work. No placeholder buttons advertise these features.
+The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. OPFS workspace storage, physical directory create/rename/move/delete operations, scanned-PDF OCR and richer format import/export, repository browsing, browser AI, encryption, lifecycle workflows, and workspace publishing remain future work. No placeholder buttons advertise these features.
 
 Core browser flows have automated Chromium coverage. Firefox, Safari, large-workspace benchmarks, and complete WCAG 2.2 AA conformance have not yet been certified. Folder selection depends on browser support; individual files and ZIP provide portable alternatives. Imported images and media are stored with their relative paths in IndexedDB and included in workspace ZIP exports. Image rendering is local; arbitrary active media is never executed.
 

@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "public/search-worker.js",
     "public/regex-worker.js",
     "public/conversion-worker.js",
+    "public/pdf-worker.js",
+    "public/pdf-assets/**",
     "public/analysis-worker.js",
     "public/graph-worker.js",
   ]),

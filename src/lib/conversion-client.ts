@@ -1,5 +1,9 @@
 import { basePath } from "./types";
-import type { ConversionInput, ConversionResult } from "./conversion-types";
+import {
+  ConversionPasswordError,
+  type ConversionInput,
+  type ConversionResult,
+} from "./conversion-types";
 export function convertInWorker(
   inputs: ConversionInput[],
   signal: AbortSignal,
@@ -77,7 +81,14 @@ export function convertInWorker(
             new Error("The selected files could not be sent to the converter."),
           );
         }
-      } else if (event.data.type === "progress") progress(event.data.message);
+      } else if (event.data.type === "password")
+        fail(
+          new ConversionPasswordError(
+            event.data.sourcePath,
+            !!event.data.incorrect,
+          ),
+        );
+      else if (event.data.type === "progress") progress(event.data.message);
       else if (event.data.type === "result") {
         if (performance.now() - startedAt > 45000) {
           fail(

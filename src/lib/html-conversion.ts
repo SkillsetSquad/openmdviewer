@@ -59,6 +59,7 @@ export async function htmlToMarkdown(
   outputPath: string,
   convertedPaths: Map<string, string>,
   embedded: ReaderAsset[] = [],
+  pdfPages: Map<string, Record<number, string>> = new Map(),
 ) {
   if (new TextEncoder().encode(html).length > conversionLimits.output)
     throw new Error(
@@ -139,11 +140,22 @@ export async function htmlToMarkdown(
               target = convertedPaths.get(
                 resolvePath(outputPath, pathname.split("?")[0]),
               );
-            if (target)
+            if (target) {
+              const requestedPage =
+                fragment &&
+                /^page=(\d+)(?:&.*)?$/i.exec(decodeURIComponent(fragment));
+              const pdfAnchor =
+                requestedPage &&
+                pdfPages.get(target)?.[Number(requestedPage[1])];
               child.properties.href =
                 localAssetReference(outputPath, target) +
                 query +
-                (fragment === undefined ? "" : "#" + fragment);
+                (pdfAnchor
+                  ? "#" + encodeURIComponent(pdfAnchor)
+                  : fragment === undefined
+                    ? ""
+                    : "#" + fragment);
+            }
           } catch {
             warnings.push("A malformed relative link could not be resolved.");
           }

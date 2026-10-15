@@ -177,3 +177,44 @@ it("uses the generated heading anchor when an HTML ID already matches its Markdo
     ),
   ).toHaveLength(1);
 });
+
+it("rejects encrypted-PDF output collisions before asking for passwords or loading a parser", async () => {
+  await expect(
+    convertImport([
+      { file: new File(["not parsed"], "Same.pdf"), path: "Imported/Same.pdf" },
+      {
+        file: new File(["# Existing Markdown"], "Same.md"),
+        path: "Imported/Same.md",
+      },
+    ]),
+  ).rejects.toThrow("conflicting paths");
+});
+
+it("rewrites PDF viewer page fragments to verified generated heading anchors", async () => {
+  const result = await htmlToMarkdown(
+    '<h1>Index</h1><a href="Other.pdf#page=2">Page link</a>',
+    "Imported/Index.md",
+    new Map([["Imported/Other.pdf", "Imported/Other.md"]]),
+    [],
+    new Map([["Imported/Other.md", { 2: "page-2-1" }]]),
+  );
+  expect(result.markdown).toContain("[Page link](Other.md#page-2-1)");
+});
+
+it("keeps PDFs marked as attachments opaque while converting other selected formats", async () => {
+  const result = await convertImport([
+    {
+      file: new File(["opaque PDF attachment"], "guide.pdf"),
+      path: "Imported/guide.pdf",
+      pdfMode: "attachment",
+    },
+    input("Index.html", '<h1>Index</h1><a href="guide.pdf">Download PDF</a>'),
+  ]);
+  expect(result.documents).toHaveLength(1);
+  expect(result.documents[0].content).toContain("[Download PDF](guide.pdf)");
+  expect(
+    await result.assets
+      .find((asset) => asset.path === "Imported/guide.pdf")!
+      .blob.text(),
+  ).toBe("opaque PDF attachment");
+});

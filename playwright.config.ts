@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
-  // The update test temporarily changes the shared static service-worker file.
+  // Update and PDF-cancellation tests temporarily change shared static assets.
   workers: 1,
   use: {
     baseURL: `http://127.0.0.1:3100${process.env.TEST_BASE_PATH || ""}/`,

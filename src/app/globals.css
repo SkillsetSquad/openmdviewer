@@ -4693,6 +4693,7 @@ kbd {
   min-width: 0;
 }
 .conversion-body select,
+.conversion-body input[type="password"],
 .conversion-body textarea {
   width: 100%;
   min-width: 0;
@@ -4754,4 +4755,16 @@ kbd {
   .conversion-body textarea {
     min-height: 160px;
   }
+}
+
+.pdf-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.pdf-password-form p {
+  overflow-wrap: anywhere;
 }

@@ -1,6 +1,6 @@
 # HTML and DOCX import
 
-Choose `.html`, `.htm`, or `.docx` using **Open files**, Ctrl/Cmd+O, the import command, or drag and drop. A mixed batch may include related images, Markdown and other already-supported local files. The converter opens a Markdown preview. No workspace records are created until **Import converted files** succeeds. **Download converted Markdown** downloads the complete result; **Discard preview**, Escape or closing the dialog discards the derived result without changing the workspace or the original files.
+Choose `.html`, `.htm`, `.docx`, or `.pdf` using **Open files**, Ctrl/Cmd+O, the import command, or drag and drop. A mixed batch may include related images, Markdown and other already-supported local files. The converter opens a Markdown preview. No workspace records are created until **Import converted files** succeeds. **Download converted Markdown** downloads the complete result; **Discard preview**, Escape or closing the dialog discards the derived result without changing the workspace or the original files.
 
 Conversion runs in a dedicated, self-hosted browser worker. It does not upload documents or require an application server. The worker is included in the offline application cache. **Cancel conversion** terminates the worker; retry starts a fresh instance. Startup has a 10-second budget and processing has a 45-second budget for the whole selected batch. Late results are rejected as well as timer expirations. Browser background scheduling can delay timeout delivery; these budgets do not claim an operating-system hard memory/CPU sandbox.
 
@@ -32,6 +32,8 @@ Tests use an independent, generated OOXML fixture with headings, emphasis, lists
 
 The conversion worker uses the packaged browser build and excludes Mammoth's CLI entry points. Its build checks that CLI-only argparse/sprintf modules do not enter the worker source graph. Dependencies remain self-hosted; there are no converter CDN or remote processing calls.
 
-PDF text extraction/OCR, DOCX export, additional converter modules, bulk conversion inside archives and precise layout reproduction remain roadmap work.
+[PDF text extraction](PDF_IMPORT.md) is implemented with page diagnostics and ephemeral password handling. Scanned-page OCR, DOCX export, additional converter modules, bulk conversion inside archives and precise layout reproduction remain roadmap work.
 
 Implementation references: [Mammoth browser API and security notes](https://github.com/mwilliamson/mammoth.js), [rehype-remark](https://github.com/rehypejs/rehype-remark), [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize).
+
+PDFs selected together with Markdown/text files remain attachments to preserve existing links. Select PDFs separately for extraction. See [PDF import](PDF_IMPORT.md) for the complete behavior and limitations.
