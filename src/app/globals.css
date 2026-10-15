@@ -682,30 +682,55 @@ kbd {
   margin-left: 18px;
 }
 .document-tabs {
-  display: flex;
+  display: grid;
   min-height: 34px;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
   background: var(--sidebar-bg);
 }
-.document-tabs > div {
+.document-tab-list,
+.document-tab-closers {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+.document-tab-button {
   display: flex;
-  gap: 10px;
-  padding: 7px 10px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 34px 7px 10px;
   border-right: 1px solid var(--border);
   color: var(--muted-foreground);
+  font-size: 10px;
+  white-space: nowrap;
 }
-.document-tabs > div.active {
+.document-tab-button.active {
   color: var(--foreground);
   border-bottom: 2px solid var(--accent-blue);
   background: var(--elevated);
 }
-.document-tabs button {
+.document-tab-closers {
+  pointer-events: none;
+}
+.document-tab-closers > div {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 10px;
-  white-space: nowrap;
+  justify-content: flex-end;
+  padding-right: 6px;
+}
+.document-tab-closers button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--muted-foreground);
+  pointer-events: auto;
+  border-radius: 4px;
+}
+.document-tab-closers button:hover {
+  background: var(--elevated-hover);
 }
 .find-bar {
   display: flex;
@@ -1340,7 +1365,7 @@ kbd {
   padding: 20px 0;
   font-size: 9px;
   line-height: 1.8;
-  opacity: 0.7;
+  opacity: 1;
 }
 .editor-pane {
   width: 100%;

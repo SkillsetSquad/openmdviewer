@@ -91,6 +91,21 @@ test("combines column filters, copy controls, JSON exports, and numeric summarie
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
     '"Name","Count","Status"',
   );
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibility.violations
+      .filter(
+        (violation) =>
+          violation.impact === "serious" || violation.impact === "critical",
+      )
+      .map((violation) => ({
+        id: violation.id,
+        nodes: violation.nodes.map((node) => ({
+          target: node.target,
+          summary: node.failureSummary,
+        })),
+      })),
+  ).toEqual([]);
   await page.screenshot({
     path: "test-results/advanced-table-desktop.png",
     fullPage: true,

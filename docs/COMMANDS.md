@@ -19,3 +19,7 @@ Document search continues to run in its separate local worker, with fuzzy terms,
 All matching runs on this device. Opening the palette does not upload documents or call a remote search service. The palette and its dependencies are included in the offline application cache.
 
 Dialogs own their keyboard interaction. Background shortcuts do not replace an open form or run document actions behind a dialog. Closing the palette preserves the underlying focus/presentation mode; pressing Escape again outside a dialog exits those reading modes.
+
+## Document tabs
+
+When more than one document is open, the active tab is a keyboard stop. Left/Right move between tabs and activate the document; Home/End choose the first/last tab. Delete closes the focused tab. Separate, labeled close buttons are available without entering the tablist. After closing, focus moves to the next active tab, or to the document panel when a single tab remains.

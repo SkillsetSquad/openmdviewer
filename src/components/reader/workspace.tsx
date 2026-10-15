@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FileTree } from "./file-tree";
+import { DocumentTabs, documentTabId } from "./document-tabs";
 import { Modal } from "./modal";
 import { Markdown } from "./markdown";
 import { useLocalSearch } from "@/hooks/use-local-search";
@@ -1031,38 +1032,18 @@ export default function Workspace() {
           </div>
         </header>
         {tabs.length > 1 && (
-          <div
-            className="document-tabs"
-            role="tablist"
-            aria-label="Open documents"
-          >
-            {tabs.map((id) => {
-              const d = documents.find((d) => d.id === id);
-              return (
-                d && (
-                  <div className={activeId === id ? "active" : ""} key={id}>
-                    <button
-                      role="tab"
-                      aria-selected={activeId === id}
-                      onClick={() => openDocument(id)}
-                    >
-                      <FileText size={13} />
-                      {fileName(d.path)}
-                    </button>
-                    <button
-                      aria-label={`Close ${fileName(d.path)} tab`}
-                      onClick={() => {
-                        flushEdit();
-                        closeTab(id);
-                      }}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )
-              );
+          <DocumentTabs
+            items={tabs.flatMap((id) => {
+              const item = documents.find((document) => document.id === id);
+              return item ? [{ id: item.id, path: item.path }] : [];
             })}
-          </div>
+            activeId={activeId}
+            onOpen={openDocument}
+            onClose={(id) => {
+              void flushEdit();
+              closeTab(id);
+            }}
+          />
         )}
         {findOpen && (
           <form
@@ -1090,7 +1071,15 @@ export default function Workspace() {
             </button>
           </form>
         )}
-        <div className={`document-area mode-${mode}`}>
+        <div
+          className={`document-area mode-${mode}`}
+          id="active-document-panel"
+          role={tabs.length > 1 && doc ? "tabpanel" : undefined}
+          aria-labelledby={
+            tabs.length > 1 && doc ? documentTabId(activeId) : undefined
+          }
+          tabIndex={-1}
+        >
           {(mode === "source" || mode === "split") && doc && (
             <section className="editor-pane" aria-label="Markdown editor">
               <div className="editor-heading">
