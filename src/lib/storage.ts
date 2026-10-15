@@ -1,3 +1,9 @@
+import {
+  assetBytes,
+  restoredAsset,
+  blobPreparationFailed,
+  type StoredAsset,
+} from "./asset-storage";
 import type {
   DirectoryImport,
   LocalDirectorySource,
@@ -37,7 +43,7 @@ export function createStorage(name = "openmdviewer") {
   const db = new Dexie(name) as Dexie & {
     documents: EntityTable<ReaderDocument, "id">;
     assets: EntityTable<ReaderAsset, "path">;
-    workspaceAssets: EntityTable<ReaderAsset, "path">;
+    workspaceAssets: EntityTable<StoredAsset, "path">;
     workspaces: EntityTable<LocalWorkspace, "id">;
     snapshots: EntityTable<DocumentSnapshot, "id">;
     searchHistory: Table<RecentSearch, [string, string]>;
@@ -111,6 +117,22 @@ export function createStorage(name = "openmdviewer") {
         all.slice(0, all.length - 50).map((s) => s.id),
       );
   }
+  let preferAssetBytes = false;
+  async function withAssetStorage<T>(
+    assets: ReaderAsset[],
+    write: (records: StoredAsset[]) => Promise<T>,
+  ): Promise<T> {
+    if (preferAssetBytes) return write(await assetBytes(assets));
+    try {
+      return await write(assets);
+    } catch (error) {
+      // write() is a complete transaction: await its rollback before retrying.
+      // Other failures (quota, conflicts, permissions, corrupt records) are not retried.
+      if (!assets.length || !blobPreparationFailed(error)) throw error;
+      preferAssetBytes = true;
+      return write(await assetBytes(assets));
+    }
+  }
   const api = {
     close: () => db.close(),
     directorySource: (workspaceId: string) =>
@@ -120,88 +142,92 @@ export function createStorage(name = "openmdviewer") {
       bundle: DirectoryImport,
       expectedToken: string | null = null,
     ) =>
-      db.transaction(
-        "rw",
-        [
-          db.workspaces,
-          db.documents,
-          db.workspaceAssets,
-          db.fileSources,
-          db.directorySources,
-        ],
-        async () => {
-          const id = bundle.source.workspaceId;
-          const current = await db.directorySources.get(id);
-          if ((current?.token || null) !== expectedToken)
-            throw new Error(
-              "Another tab changed this folder connection. Scan again before adding files.",
-            );
-          if (
-            bundle.workspace.id !== id ||
-            bundle.documents.length !== bundle.files.length
-          )
-            throw new Error("Invalid folder connection workspace.");
-          if (!expectedToken) await db.workspaces.add(bundle.workspace);
-          else if (!(await db.workspaces.get(id)))
-            throw new Error("This workspace is no longer available.");
-          const paths = new Set<string>();
-          const previous = new Set(
-            current?.entries.map((entry) => entry.path) || [],
-          );
-          const assets = await db.workspaceAssets
-            .where("workspaceId")
-            .equals(id)
-            .toArray();
-          const existingAssets = new Set(assets.map((asset) => asset.path));
-          const ids = new Set<string>();
-          const fileById = new Map(
-            bundle.files.map((file) => [file.documentId, file]),
-          );
-          const entryById = new Map(
-            bundle.source.entries
-              .filter((entry) => entry.documentId)
-              .map((entry) => [entry.documentId!, entry.path]),
-          );
-          for (const doc of bundle.documents) {
-            const file = fileById.get(doc.id);
-            if (
-              doc.workspaceId !== id ||
-              file?.workspaceId !== id ||
-              file.directoryId !== id ||
-              entryById.get(doc.id) !== doc.path ||
-              ids.has(doc.id) ||
-              paths.has(doc.path) ||
-              previous.has(doc.path) ||
-              existingAssets.has(doc.path)
-            )
-              throw new Error("Invalid or conflicting folder document path.");
-            await ensurePath(doc);
-            ids.add(doc.id);
-            paths.add(doc.path);
-          }
-          for (const asset of bundle.assets) {
-            if (
-              asset.workspaceId !== id ||
-              paths.has(asset.path) ||
-              previous.has(asset.path) ||
-              existingAssets.has(asset.path) ||
-              (await db.documents
-                .where("[workspaceId+path]")
-                .equals([id, asset.path])
-                .count())
-            )
+      withAssetStorage(bundle.assets, (assetRecords) =>
+        db.transaction(
+          "rw",
+          [
+            db.workspaces,
+            db.documents,
+            db.workspaceAssets,
+            db.fileSources,
+            db.directorySources,
+          ],
+          async () => {
+            const id = bundle.source.workspaceId;
+            const current = await db.directorySources.get(id);
+            if ((current?.token || null) !== expectedToken)
               throw new Error(
-                "That folder path already exists in the browser workspace.",
+                "Another tab changed this folder connection. Scan again before adding files.",
               );
-            paths.add(asset.path);
-          }
-          if ((await scoped(id).count()) + bundle.documents.length > 10000)
-            throw new Error("This workspace supports up to 10,000 documents.");
-          await db.documents.bulkAdd(bundle.documents);
-          await db.workspaceAssets.bulkAdd(bundle.assets);
-          await db.fileSources.bulkAdd(bundle.files);
-          await db.directorySources.put(bundle.source);
-        },
+            if (
+              bundle.workspace.id !== id ||
+              bundle.documents.length !== bundle.files.length
+            )
+              throw new Error("Invalid folder connection workspace.");
+            if (!expectedToken) await db.workspaces.add(bundle.workspace);
+            else if (!(await db.workspaces.get(id)))
+              throw new Error("This workspace is no longer available.");
+            const paths = new Set<string>();
+            const previous = new Set(
+              current?.entries.map((entry) => entry.path) || [],
+            );
+            const assets = await db.workspaceAssets
+              .where("workspaceId")
+              .equals(id)
+              .toArray();
+            const existingAssets = new Set(assets.map((asset) => asset.path));
+            const ids = new Set<string>();
+            const fileById = new Map(
+              bundle.files.map((file) => [file.documentId, file]),
+            );
+            const entryById = new Map(
+              bundle.source.entries
+                .filter((entry) => entry.documentId)
+                .map((entry) => [entry.documentId!, entry.path]),
+            );
+            for (const doc of bundle.documents) {
+              const file = fileById.get(doc.id);
+              if (
+                doc.workspaceId !== id ||
+                file?.workspaceId !== id ||
+                file.directoryId !== id ||
+                entryById.get(doc.id) !== doc.path ||
+                ids.has(doc.id) ||
+                paths.has(doc.path) ||
+                previous.has(doc.path) ||
+                existingAssets.has(doc.path)
+              )
+                throw new Error("Invalid or conflicting folder document path.");
+              await ensurePath(doc);
+              ids.add(doc.id);
+              paths.add(doc.path);
+            }
+            for (const asset of bundle.assets) {
+              if (
+                asset.workspaceId !== id ||
+                paths.has(asset.path) ||
+                previous.has(asset.path) ||
+                existingAssets.has(asset.path) ||
+                (await db.documents
+                  .where("[workspaceId+path]")
+                  .equals([id, asset.path])
+                  .count())
+              )
+                throw new Error(
+                  "That folder path already exists in the browser workspace.",
+                );
+              paths.add(asset.path);
+            }
+            if ((await scoped(id).count()) + bundle.documents.length > 10000)
+              throw new Error(
+                "This workspace supports up to 10,000 documents.",
+              );
+            await db.documents.bulkAdd(bundle.documents);
+            await db.workspaceAssets.bulkAdd(assetRecords);
+            await db.fileSources.bulkAdd(bundle.files);
+            await db.directorySources.put(bundle.source);
+          },
+        ),
       ),
     disconnectDirectory: (workspaceId: string, expectedToken: string) =>
       db.transaction("rw", db.directorySources, db.fileSources, async () => {
@@ -331,24 +357,30 @@ export function createStorage(name = "openmdviewer") {
         .toArray(),
     get: (id: string) => db.documents.get(id),
     loadAssets: (workspaceId = "default") =>
-      db.workspaceAssets.where("workspaceId").equals(workspaceId).toArray(),
+      db.workspaceAssets
+        .where("workspaceId")
+        .equals(workspaceId)
+        .toArray()
+        .then((assets) => assets.map(restoredAsset)),
     import: (
       documents: ReaderDocument[],
       assets: ReaderAsset[],
       workspaceId = "default",
     ) =>
-      db.transaction("rw", db.documents, db.workspaceAssets, async () => {
-        const scopedDocs = documents.map((d) => ({
-          ...d,
-          workspaceId,
-          revision: 0,
-        }));
-        for (const doc of scopedDocs) await ensurePath(doc);
-        await db.documents.bulkAdd(scopedDocs);
-        await db.workspaceAssets.bulkAdd(
-          assets.map((a) => ({ ...a, workspaceId })),
-        );
-      }),
+      withAssetStorage(assets, (assetRecords) =>
+        db.transaction("rw", db.documents, db.workspaceAssets, async () => {
+          const scopedDocs = documents.map((d) => ({
+            ...d,
+            workspaceId,
+            revision: 0,
+          }));
+          for (const doc of scopedDocs) await ensurePath(doc);
+          await db.documents.bulkAdd(scopedDocs);
+          await db.workspaceAssets.bulkAdd(
+            assetRecords.map((a) => ({ ...a, workspaceId })),
+          );
+        }),
+      ),
     // Compatibility helpers for initial document creation; content edits use save().
     put: async (doc: ReaderDocument) => {
       const created = {
@@ -398,49 +430,54 @@ export function createStorage(name = "openmdviewer") {
       documents: ReaderDocument[],
       assets: ReaderAsset[],
     ) =>
-      db.transaction(
-        "rw",
-        db.workspaces,
-        db.documents,
-        db.workspaceAssets,
-        async () => {
-          if (
-            !workspace.id ||
-            !workspace.name.trim() ||
-            !documents.length ||
-            documents.length > 10000 ||
-            !workspace.initialized
-          )
-            throw new Error("Invalid imported workspace.");
-          const paths = new Set<string>(),
-            ids = new Set<string>();
-          for (const item of [...documents, ...assets]) {
-            if (safePath(item.path) !== item.path || paths.has(item.path))
-              throw new Error(
-                "Imported workspace contains invalid or duplicate paths.",
-              );
-            paths.add(item.path);
-          }
-          for (const doc of documents) {
-            if (!doc.id || ids.has(doc.id))
-              throw new Error(
-                "Imported workspace contains duplicate document IDs.",
-              );
-            ids.add(doc.id);
-          }
-          await db.workspaces.add(workspace);
-          await db.documents.bulkAdd(
-            documents.map((doc) => ({
-              ...doc,
-              workspaceId: workspace.id,
-              revision: 0,
-            })),
-          );
-          if (assets.length)
-            await db.workspaceAssets.bulkAdd(
-              assets.map((asset) => ({ ...asset, workspaceId: workspace.id })),
+      withAssetStorage(assets, (assetRecords) =>
+        db.transaction(
+          "rw",
+          db.workspaces,
+          db.documents,
+          db.workspaceAssets,
+          async () => {
+            if (
+              !workspace.id ||
+              !workspace.name.trim() ||
+              !documents.length ||
+              documents.length > 10000 ||
+              !workspace.initialized
+            )
+              throw new Error("Invalid imported workspace.");
+            const paths = new Set<string>(),
+              ids = new Set<string>();
+            for (const item of [...documents, ...assets]) {
+              if (safePath(item.path) !== item.path || paths.has(item.path))
+                throw new Error(
+                  "Imported workspace contains invalid or duplicate paths.",
+                );
+              paths.add(item.path);
+            }
+            for (const doc of documents) {
+              if (!doc.id || ids.has(doc.id))
+                throw new Error(
+                  "Imported workspace contains duplicate document IDs.",
+                );
+              ids.add(doc.id);
+            }
+            await db.workspaces.add(workspace);
+            await db.documents.bulkAdd(
+              documents.map((doc) => ({
+                ...doc,
+                workspaceId: workspace.id,
+                revision: 0,
+              })),
             );
-        },
+            if (assets.length)
+              await db.workspaceAssets.bulkAdd(
+                assetRecords.map((asset) => ({
+                  ...asset,
+                  workspaceId: workspace.id,
+                })),
+              );
+          },
+        ),
       ),
     async createWorkspace(name: string, description = "", icon = "📁") {
       const workspace: LocalWorkspace = {

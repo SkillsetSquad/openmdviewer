@@ -1,0 +1,42 @@
+name: Cross-browser reader compatibility
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reader:
+    name: Reader in ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Build root static application
+        run: npm run build
+      - name: Verify root reader contracts
+        run: npm run test:compat -- --project=${{ matrix.browser }}
+      - name: Build subpath static application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /openmdviewer
+      - name: Verify subpath reader contracts
+        run: npm run test:subpath -- --config=playwright.compat.config.ts --project=${{ matrix.browser }}
+      - name: Retain browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-compatibility-${{ matrix.browser }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -30,6 +30,8 @@
 - Match the reference: dark three-pane reader, blue accents, file tree, document toolbar, typography, contents/properties panel. Support small screens, keyboard navigation, reduced motion, and print.
 - Every visible control must work. No fabricated statistics or placeholder features.
 - Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` for relevant changes; exercise core flows with Playwright.
+- Preserve legacy Blob assets. Retry only the exact native Blob-preparation failure after transaction rollback, serialize fallback bytes outside the transaction, reconstruct Blobs at the storage boundary, and repeat all source/token/path checks on retry. Do not retry quota or unrelated persistence failures.
+- Keep cross-browser verification independent of host browser profiles and privacy settings. Reuse real reader contracts, run serially against isolated static output, retain failure evidence, and distinguish Playwright engine coverage from shipping-browser certification.
 - Keep deployment reproducible with npm lockfile, static Pages workflow, and a Node-free runtime Docker image.
 
 <!-- BEGIN:nextjs-agent-rules -->

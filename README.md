@@ -50,7 +50,7 @@ Remote Markdown images, audio, video, posters, and captions are blocked until in
 
 The full supplied [product specification](docs/PRODUCT_BRIEF.md) is retained as a phased roadmap, not a claim that every proposed feature exists. OPFS workspace storage, physical directory create/rename/move/delete operations, scanned-PDF OCR and richer format import/export, additional repository providers, browser AI, encryption, lifecycle workflows, and richer publishing layouts remain future work. No placeholder buttons advertise these features.
 
-Core browser flows have automated Chromium coverage. Firefox, Safari, large-workspace benchmarks, and complete WCAG 2.2 AA conformance have not yet been certified. Folder selection depends on browser support; individual files and ZIP provide portable alternatives. Imported images and media are stored with their relative paths in IndexedDB and included in workspace ZIP exports. Image rendering is local; arbitrary active media is never executed.
+Core browser flows have automated Chromium coverage. A separate Firefox/WebKit core reader workflow reuses the existing contracts at both hosting paths; see [browser testing and verification limits](docs/BROWSER_TESTING.md). Shipping Firefox/Safari versions, large-workspace benchmarks, and complete WCAG 2.2 AA conformance have not yet been certified. Folder selection depends on browser support; individual files and ZIP provide portable alternatives. Imported images and media are stored with their relative paths in IndexedDB and included in workspace ZIP exports. Image rendering is local; arbitrary active media is never executed.
 
 ## Development checks
 

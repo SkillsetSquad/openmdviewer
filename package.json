@@ -13,7 +13,8 @@
     "postbuild": "node scripts/prepare-static.mjs",
     "prebuild": "node scripts/prepare-build.mjs && node scripts/build-worker.mjs",
     "predev": "node scripts/build-worker.mjs",
-    "test:subpath": "node scripts/test-subpath.mjs"
+    "test:subpath": "node scripts/test-subpath.mjs",
+    "test:compat": "playwright test --config=playwright.compat.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
