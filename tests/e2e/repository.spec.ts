@@ -449,3 +449,48 @@ test("paginates large folders without additional requests and keeps mobile brows
   ).toBe(true);
   await page.screenshot({ path: "/tmp/openmdviewer-repository-mobile.png" });
 });
+
+test("a Git LFS image pointer fails the complete import without fetching external LFS content", async ({
+  page,
+  context,
+}) => {
+  const pointer = Buffer.from(
+      "version https://git-lfs.github.com/spec/v1\noid sha256:" +
+        "a".repeat(64) +
+        "\nsize 999999\n",
+    ),
+    id = gitBlob(pointer),
+    external: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("git-lfs.github.com"))
+      external.push(request.url());
+  });
+  await mock(context, (url, result) => {
+    if (url.includes(`/git/trees/${trees.docs}`)) {
+      const tree = JSON.parse(result.body.toString()),
+        image = tree.tree.find(
+          (entry: { path: string }) => entry.path === "picture.png",
+        );
+      image.sha = id;
+      image.size = pointer.length;
+      return { ...result, body: Buffer.from(JSON.stringify(tree)) };
+    }
+    if (url.endsWith("/git/blobs/" + id))
+      return { ...result, status: 200, body: pointer };
+    return result;
+  });
+  const before = await allData(page),
+    dialog = await connect(page);
+  await dialog
+    .getByRole("button", { name: "Folder docs", exact: true })
+    .click();
+  await dialog
+    .getByRole("checkbox", { name: "Select docs/picture.png", exact: true })
+    .check();
+  await dialog
+    .getByRole("button", { name: "Import selected files locally", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toContainText("Git LFS pointer");
+  expect(await allData(page)).toEqual(before);
+  expect(external).toEqual([]);
+});

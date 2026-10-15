@@ -260,3 +260,41 @@ it("round-trips only validated repository provenance through portable workspace 
   applyWorkspaceMetadata([unsafe], JSON.stringify(data));
   expect(unsafe.repositorySource).toBeUndefined();
 });
+
+it("rejects a verified Git LFS pointer even when the selected asset has an image extension", async () => {
+  const pointer = Buffer.from(
+      "version https://git-lfs.github.com/spec/v1\noid sha256:" +
+        "a".repeat(64) +
+        "\nsize 999999\n",
+    ),
+    id = gitBlob(pointer);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string | URL | Request) => {
+      const value = String(url),
+        result = githubResponse(value);
+      if (value.includes(`/git/trees/${trees.docs}`)) {
+        const data = JSON.parse(result.body.toString());
+        const image = data.tree.find(
+          (entry: { path: string }) => entry.path === "picture.png",
+        );
+        image.sha = id;
+        image.size = pointer.length;
+        return new Response(JSON.stringify(data), { headers: result.headers });
+      }
+      if (value.endsWith("/git/blobs/" + id))
+        return new Response(pointer, { headers: result.headers });
+      return new Response(result.body, {
+        status: result.status,
+        headers: result.headers,
+      });
+    }),
+  );
+  const client = new GitHubRepository({ owner: "example", name: "manual" }),
+    pinned = await client.snapshot({ kind: "branch", name: "main" }, signal()),
+    files = await client.directory(pinned, "docs", signal()),
+    image = files.find((entry) => entry.name === "picture.png")!;
+  await expect(client.read(pinned, image, signal())).rejects.toThrow(
+    "Git LFS pointer",
+  );
+});

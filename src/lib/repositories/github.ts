@@ -425,6 +425,15 @@ export class GitHubRepository implements RepositoryAdapter {
       throw new Error(
         "The file bytes do not match the pinned Git blob ID. Nothing was imported.",
       );
+    if (
+      new TextDecoder()
+        .decode(bytes.slice(0, 128))
+        .replace(/^\uFEFF/, "")
+        .startsWith("version https://git-lfs.github.com/spec/v1")
+    )
+      throw new Error(
+        "This is a Git LFS pointer. Its external content is not fetched by the reader.",
+      );
     if (this.blobBytes + bytes.length > repositoryLimits.batchBytes)
       throw new Error(
         "This repository session exceeds its 50 MB verified-content cache limit. Reopen it to start a fresh session.",
