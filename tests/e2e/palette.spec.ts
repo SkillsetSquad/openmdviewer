@@ -64,6 +64,18 @@ test("fuzzy commands support virtual keyboard focus, wrapping, Enter, and Escape
   await expect(
     page.getByRole("option", { name: "Reading settings", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Escape");
+  await expect(trigger).toBeFocused();
+});
+
+test("command search remains accessible with virtual selection", async ({
+  page,
+}) => {
+  const input = await openPalette(page);
+  await input.fill("settngs");
+  await expect(
+    page.getByRole("option", { name: "Reading settings", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   const axe = await new AxeBuilder({ page }).analyze();
   expect(
     axe.violations
@@ -74,11 +86,31 @@ test("fuzzy commands support virtual keyboard focus, wrapping, Enter, and Escape
     path: "test-results/command-palette.png",
     fullPage: true,
   });
+  await page.keyboard.press("Escape");
+});
+
+test("command dialogs close before search reopens and restores its trigger focus", async ({
+  page,
+}) => {
+  const trigger = page.getByRole("button", { name: /^Search files/ });
+  await trigger.click();
+  const input = page.getByRole("combobox", {
+    name: "Search documents and commands",
+    exact: true,
+  });
+  await expect(input).toBeFocused();
+  await input.fill("settngs");
+  await expect(
+    page.getByRole("option", { name: "Reading settings", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   await input.press("Enter");
   await expect(
     page.getByRole("dialog", { name: "Make yourself at home" }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("dialog", { name: "Make yourself at home" }),
+  ).not.toBeVisible();
   const search = await openPalette(page);
   await search.fill("grph");
   await expect(
@@ -89,6 +121,9 @@ test("fuzzy commands support virtual keyboard focus, wrapping, Enter, and Escape
     page.getByRole("dialog", { name: "Workspace graph" }).locator("canvas"),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("dialog", { name: "Workspace graph" }),
+  ).not.toBeVisible();
   await trigger.click();
   await expect(
     page.getByRole("combobox", { name: "Search documents and commands" }),

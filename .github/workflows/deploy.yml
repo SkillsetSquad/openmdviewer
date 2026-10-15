@@ -36,6 +36,14 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /openmdviewer
       - name: Verify deployed subpath in the browser
         run: npm run test:subpath
+      - name: Retain browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-evidence
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out
