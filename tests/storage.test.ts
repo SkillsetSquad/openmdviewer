@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import Dexie from "dexie";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStorage, DocumentConflict } from "../src/lib/storage";
 import { newDocument } from "../src/lib/documents";
 const names: string[] = [];
@@ -90,4 +90,25 @@ describe("durable workspace storage", () => {
     expect(await storage.load()).toEqual([]);
     storage.close();
   });
+});
+
+it("retains the newest 50 revisions even when timestamps are identical", async () => {
+  const { storage } = make();
+  await storage.initialize([]);
+  let doc = await storage.put(newDocument("Revisions.md", "revision 0"));
+  const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
+  try {
+    for (let i = 1; i <= 55; i++)
+      doc = await storage.save(
+        { ...doc, content: `revision ${i}` },
+        doc.revision || 0,
+      );
+    const history = await storage.snapshots(doc.id);
+    expect(history).toHaveLength(50);
+    expect(history[0].document.revision).toBe(54);
+    expect(history[49].document.revision).toBe(5);
+  } finally {
+    clock.mockRestore();
+    storage.close();
+  }
 });

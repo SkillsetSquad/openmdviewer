@@ -54,12 +54,10 @@ export function createStorage(name = "openmdviewer") {
       await tx
         .table("workspaceAssets")
         .bulkPut(assets.map((a) => ({ ...a, workspaceId: "default" })));
-      await tx
-        .table("workspaces")
-        .put({
-          ...defaultWorkspace(),
-          initialized: (await tx.table("documents").count()) > 0,
-        });
+      await tx.table("workspaces").put({
+        ...defaultWorkspace(),
+        initialized: (await tx.table("documents").count()) > 0,
+      });
     });
   const scoped = (id = "default") =>
     db.documents.where("workspaceId").equals(id);
@@ -84,10 +82,12 @@ export function createStorage(name = "openmdviewer") {
       createdAt: Date.now(),
       reason,
     });
-    const all = await db.snapshots
-      .where("documentId")
-      .equals(doc.id)
-      .sortBy("createdAt");
+    const all = await db.snapshots.where("documentId").equals(doc.id).toArray();
+    all.sort(
+      (a, b) =>
+        (a.document.revision || 0) - (b.document.revision || 0) ||
+        a.createdAt - b.createdAt,
+    );
     if (all.length > 50)
       await db.snapshots.bulkDelete(
         all.slice(0, all.length - 50).map((s) => s.id),
@@ -212,12 +212,17 @@ export function createStorage(name = "openmdviewer") {
         icon: icon.slice(0, 8) || "📁",
       });
     },
-    snapshots: (documentId: string) =>
-      db.snapshots
+    snapshots: async (documentId: string) => {
+      const items = await db.snapshots
         .where("documentId")
         .equals(documentId)
-        .reverse()
-        .sortBy("createdAt"),
+        .toArray();
+      return items.sort(
+        (a, b) =>
+          (b.document.revision || 0) - (a.document.revision || 0) ||
+          b.createdAt - a.createdAt,
+      );
+    },
     trash: (doc: ReaderDocument, expectedRevision: number) =>
       db.transaction("rw", db.documents, db.snapshots, async () => {
         const current = await db.documents.get(doc.id);
