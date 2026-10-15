@@ -13,8 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MD Viewer",
-  description: "A fresh foundation for MD Viewer.",
+  title: "OpenMDViewer — Your words. Your space.",
+  description:
+    "A beautiful, private Markdown workspace. Read, edit, and organize your documents entirely in your browser. Free, open-source, and yours to self-host.",
+  manifest: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/manifest.webmanifest`,
+  icons: {
+    icon: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/icon.svg`,
+    apple: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/icon-192.png`,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
