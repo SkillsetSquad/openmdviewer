@@ -799,11 +799,9 @@ test("runs transparent local health checks, exports findings, and opens the affe
     .getByRole("button", { name: "Analyze document", exact: true })
     .click();
   await expect(
-    page
-      .getByRole("dialog", { name: "Document health" })
-      .getByRole("button", {
-        name: /Missing local document or attachment: Imported\/Missing.md/,
-      }),
+    page.getByRole("dialog", { name: "Document health" }).getByRole("button", {
+      name: /Missing local document or attachment: Imported\/Missing.md/,
+    }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Scoring rules", exact: true }).click();
   await expect(
@@ -892,4 +890,114 @@ test("opens whole-workspace health and downloads imported attachments locally", 
       .filter((v) => v.impact === "serious" || v.impact === "critical")
       .map((v) => v.id),
   ).toEqual([]);
+});
+
+test("retains multiple queued conflicts until both documents have been recovered", async ({
+  page,
+  context,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles([
+      {
+        name: "Queue A.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Original A"),
+      },
+      {
+        name: "Queue B.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Original B"),
+      },
+    ]);
+  const second = await context.newPage();
+  await second.goto("./");
+  await expect(
+    second.getByRole("heading", { name: "Original A", exact: true }),
+  ).toBeVisible();
+  await second.getByRole("button", { name: "Split view", exact: true }).click();
+  await page.evaluate(() => {
+    const marker = window as Window & {
+      __saveLock?: boolean;
+      __saveLockDone?: boolean;
+    };
+    const request = indexedDB.open("openmdviewer");
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction("documents", "readwrite");
+      const store = tx.objectStore("documents");
+      const all = store.getAll();
+      all.onsuccess = () => {
+        for (const doc of all.result) {
+          if (
+            doc.path === "Imported/Queue A.md" ||
+            doc.path === "Imported/Queue B.md"
+          )
+            store.put({
+              ...doc,
+              content: doc.path.endsWith("A.md") ? "# First A" : "# First B",
+              revision: (doc.revision || 0) + 1,
+            });
+        }
+        const until = performance.now() + 2500;
+        const hold = () => {
+          const pending = store.get("__keep_transaction_active__");
+          pending.onsuccess = () => {
+            if (performance.now() < until) hold();
+          };
+        };
+        marker.__saveLock = true;
+        hold();
+      };
+      tx.oncomplete = () => {
+        db.close();
+        marker.__saveLockDone = true;
+      };
+    };
+  });
+  await page.waitForFunction(
+    () => (window as Window & { __saveLock?: boolean }).__saveLock === true,
+  );
+  await second.locator(".cm-content").fill("# Second A");
+  await second.getByRole("button", { name: "Queue B.md", exact: true }).click();
+  await second.locator(".cm-content").fill("# Second B");
+  await page.waitForFunction(
+    () =>
+      (window as Window & { __saveLockDone?: boolean }).__saveLockDone === true,
+  );
+  const modal = second.getByRole("dialog", {
+    name: "This document changed in another tab",
+  });
+  await expect(modal).toContainText("Queue A.md");
+  await second
+    .getByRole("button", { name: "Keep both versions", exact: true })
+    .click();
+  await expect(modal).toContainText("Queue B.md");
+  await second
+    .getByRole("button", { name: "Keep both versions", exact: true })
+    .click();
+  await expect(modal).toHaveCount(0);
+  await second.reload();
+  await second
+    .getByRole("button", { name: "Queue A (conflict copy 1).md", exact: true })
+    .click();
+  await expect(
+    second.getByRole("heading", { name: "Second A", exact: true }),
+  ).toBeVisible();
+  await second
+    .getByRole("button", { name: "Queue B (conflict copy 1).md", exact: true })
+    .click();
+  await expect(
+    second.getByRole("heading", { name: "Second B", exact: true }),
+  ).toBeVisible();
+  await second.getByRole("button", { name: "Queue A.md", exact: true }).click();
+  await expect(
+    second.getByRole("heading", { name: "First A", exact: true }),
+  ).toBeVisible();
+  await second.close();
 });

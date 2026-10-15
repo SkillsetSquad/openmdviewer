@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SaveLedger } from "@/lib/save-ledger";
 import { storage, DocumentConflict } from "@/lib/storage";
 import { exampleDocuments } from "@/lib/examples";
 import { useReader } from "@/lib/store";
@@ -77,6 +78,9 @@ export function useWorkspaceSession(notify: (message: string) => void) {
     current: ReaderDocument;
     local: ReaderDocument;
   } | null>(null);
+  const ledger = useRef(new SaveLedger());
+  const resolvingRef = useRef(false);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
   const revisions = useRef(new Map<string, number>());
   const queue = useRef<Promise<boolean>>(Promise.resolve(true));
   const savingCount = useRef(0);
@@ -105,11 +109,21 @@ export function useWorkspaceSession(notify: (message: string) => void) {
               d.id === saved.id ? { ...d, revision: saved.revision } : d,
             ),
           }));
-          setStorageStatus("Saved in this browser");
+          ledger.current.success(saved.id);
+          setStorageStatus(
+            ledger.current.firstConflict()
+              ? "Conflicting changes need review"
+              : ledger.current.hasFailures()
+                ? "Browser storage unavailable"
+                : savingCount.current > 1 || pendingEdit.current
+                  ? "Saving to browser…"
+                  : "Saved in this browser",
+          );
           return true;
         } catch (error) {
+          ledger.current.failure(document, error);
           if (error instanceof DocumentConflict) {
-            setConflict({ current: error.current, local: document });
+            setConflict(ledger.current.firstConflict());
             setStorageStatus("Conflicting changes need review");
           } else {
             setStorageStatus("Browser storage unavailable");
@@ -134,7 +148,8 @@ export function useWorkspaceSession(notify: (message: string) => void) {
     const pending = pendingEdit.current;
     pendingEdit.current = null;
     if (pending) await save(pending);
-    return queue.current;
+    const ok = await queue.current;
+    return ok && !ledger.current.hasFailures();
   }, [save]);
   const scheduleSave = useCallback(
     (document: ReaderDocument) => {
@@ -148,7 +163,10 @@ export function useWorkspaceSession(notify: (message: string) => void) {
     [flushEdit],
   );
   const hasPendingChanges = useCallback(
-    () => !!pendingEdit.current || savingCount.current > 0,
+    () =>
+      !!pendingEdit.current ||
+      savingCount.current > 0 ||
+      ledger.current.hasFailures(),
     [],
   );
   useEffect(() => {
@@ -246,57 +264,85 @@ export function useWorkspaceSession(notify: (message: string) => void) {
   );
   const resolveConflict = useCallback(
     async (keepBoth: boolean) => {
-      if (!conflict) return;
-      if (editTimer.current) clearTimeout(editTimer.current);
-      pendingEdit.current = null;
-      await queue.current;
-      const local =
-        useReader
-          .getState()
-          .documents.find((d) => d.id === conflict.local.id) || conflict.local;
-      const current = await storage.get(conflict.current.id);
-      if (!current) {
-        notify(
-          "The saved document is no longer available. Download your local copy.",
-        );
-        return;
-      }
-      const documents = useReader.getState().documents;
-      let copy: ReaderDocument | undefined;
-      if (keepBoth) {
-        let n = 1;
-        let path = local.path.replace(/(\.[^.]*)?$/, ` (conflict copy ${n})$1`);
-        const paths = new Set(
-          (await storage.load(local.workspaceId)).map((d) => d.path),
-        );
-        while (paths.has(path))
-          path = local.path.replace(/(\.[^.]*)?$/, ` (conflict copy ${++n})$1`);
-        copy = await storage.put({
-          ...newDocument(path, local.content),
-          workspaceId: local.workspaceId,
-          tags: local.tags,
+      if (!conflict || resolvingRef.current) return;
+      resolvingRef.current = true;
+      setResolvingConflict(true);
+      try {
+        if (editTimer.current) clearTimeout(editTimer.current);
+        const pending = pendingEdit.current;
+        pendingEdit.current = null;
+        if (pending && pending.id !== conflict.local.id) await save(pending);
+        await queue.current;
+        const local =
+          useReader
+            .getState()
+            .documents.find((d) => d.id === conflict.local.id) ||
+          conflict.local;
+        const current = await storage.get(conflict.current.id);
+        if (!current) {
+          notify(
+            "The saved document is no longer available. Download your local copy.",
+          );
+          return;
+        }
+        const documents = useReader.getState().documents;
+        let copy: ReaderDocument | undefined;
+        if (keepBoth) {
+          let n = 1;
+          let path = local.path.replace(
+            /(\.[^.]*)?$/,
+            ` (conflict copy ${n})$1`,
+          );
+          const paths = new Set(
+            (await storage.load(local.workspaceId)).map((d) => d.path),
+          );
+          while (paths.has(path))
+            path = local.path.replace(
+              /(\.[^.]*)?$/,
+              ` (conflict copy ${++n})$1`,
+            );
+          copy = await storage.put({
+            ...newDocument(path, local.content),
+            workspaceId: local.workspaceId,
+            tags: local.tags,
+          });
+        }
+        revisions.current.set(current.id, current.revision || 0);
+        useReader.setState({
+          documents: [
+            ...documents.filter((d) => d.id !== current.id),
+            ...(!current.deletedAt ? [current] : []),
+            ...(copy ? [copy] : []),
+          ],
         });
+        if (copy) useReader.getState().open(copy.id);
+        else if (!current.deletedAt) useReader.getState().open(current.id);
+        else useReader.getState().closeTab(current.id);
+        ledger.current.resolve(current.id);
+        setConflict(ledger.current.firstConflict());
+        queue.current = Promise.resolve(true);
+        setStorageStatus(
+          ledger.current.firstConflict()
+            ? "Conflicting changes need review"
+            : ledger.current.hasFailures()
+              ? "Browser storage unavailable"
+              : "Saved in this browser",
+        );
+        notify(
+          keepBoth
+            ? "Both versions are preserved. Your edits are in a separate document."
+            : "Loaded the saved version.",
+        );
+      } catch {
+        notify(
+          "Could not resolve this conflict. Your local edits are still retained; download a copy before reloading.",
+        );
+      } finally {
+        resolvingRef.current = false;
+        setResolvingConflict(false);
       }
-      revisions.current.set(current.id, current.revision || 0);
-      useReader.setState({
-        documents: [
-          ...documents.filter((d) => d.id !== current.id),
-          ...(!current.deletedAt ? [current] : []),
-          ...(copy ? [copy] : []),
-        ],
-      });
-      if (copy) useReader.getState().open(copy.id);
-      else if (!current.deletedAt) useReader.getState().open(current.id);
-      queue.current = Promise.resolve(true);
-      setConflict(null);
-      setStorageStatus("Saved in this browser");
-      notify(
-        keepBoth
-          ? "Both versions are preserved. Your edits are in a separate document."
-          : "Loaded the saved version.",
-      );
     },
-    [conflict, notify],
+    [conflict, notify, save],
   );
   return {
     loaded,
@@ -315,5 +361,6 @@ export function useWorkspaceSession(notify: (message: string) => void) {
     switchWorkspace,
     conflict,
     resolveConflict,
+    resolvingConflict,
   };
 }

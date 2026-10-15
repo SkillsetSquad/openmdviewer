@@ -150,6 +150,7 @@ export default function Workspace() {
     switchWorkspace,
     conflict,
     resolveConflict,
+    resolvingConflict,
   } = session;
   const [dialog, setDialog] = useState<DialogName>(null);
   const [query, setQuery] = useState("");
@@ -418,7 +419,7 @@ export default function Workspace() {
       zipSync(data) as BlobPart,
       "application/zip",
     );
-    notify("Workspace ZIP downloaded.");
+    notify("Workspace ZIP download requested.");
   }
   async function copy(text: string, message: string) {
     try {
@@ -2113,11 +2114,15 @@ export default function Workspace() {
             </Button>
             <Button
               variant="outline"
+              disabled={resolvingConflict}
               onClick={() => void resolveConflict(false)}
             >
               Load saved version
             </Button>
-            <Button onClick={() => void resolveConflict(true)}>
+            <Button
+              disabled={resolvingConflict}
+              onClick={() => void resolveConflict(true)}
+            >
               Keep both versions
             </Button>
           </div>
