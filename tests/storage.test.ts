@@ -138,3 +138,39 @@ it("preserves personal reading data across content edits, trash recovery and rev
   ]);
   storage.close();
 });
+
+it("imports a complete standalone workspace atomically and preserves unrelated workspaces on failure", async () => {
+  const { storage } = make();
+  await storage.initialize([]);
+  await storage.put(newDocument("Existing.md", "preserve"));
+  const workspace = {
+    id: "repo-import",
+    name: "Repository",
+    description: "Pinned snapshot",
+    icon: "📦",
+    createdAt: Date.now(),
+    initialized: true,
+  };
+  const doc = newDocument("docs/Guide.md", "# Guide");
+  await storage.createImportedWorkspace(
+    workspace,
+    [doc],
+    [{ path: "docs/image.png", blob: new Blob(["bytes"]), type: "image/png" }],
+  );
+  expect((await storage.load(workspace.id))[0].path).toBe("docs/Guide.md");
+  expect(await (await storage.loadAssets(workspace.id))[0].blob.text()).toBe(
+    "bytes",
+  );
+  const count = (await storage.workspaces()).length;
+  await expect(
+    storage.createImportedWorkspace(
+      { ...workspace, id: "failed-repo" },
+      [{ ...doc, path: "Other.md" }],
+      [],
+    ),
+  ).rejects.toThrow();
+  expect((await storage.workspaces()).length).toBe(count);
+  expect(await storage.load("failed-repo")).toEqual([]);
+  expect((await storage.load())[0].content).toBe("preserve");
+  storage.close();
+});

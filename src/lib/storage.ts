@@ -3,6 +3,7 @@ import type {
   LocalDirectorySource,
 } from "./local-directory-types";
 import type { LocalFileSource } from "./local-file-types";
+import { safePath } from "./paths";
 import Dexie, { type EntityTable, type Table } from "dexie";
 import type {
   ReaderDocument,
@@ -392,6 +393,55 @@ export function createStorage(name = "openmdviewer") {
         return next;
       }),
     workspaces: () => db.workspaces.orderBy("createdAt").toArray(),
+    createImportedWorkspace: (
+      workspace: LocalWorkspace,
+      documents: ReaderDocument[],
+      assets: ReaderAsset[],
+    ) =>
+      db.transaction(
+        "rw",
+        db.workspaces,
+        db.documents,
+        db.workspaceAssets,
+        async () => {
+          if (
+            !workspace.id ||
+            !workspace.name.trim() ||
+            !documents.length ||
+            documents.length > 10000 ||
+            !workspace.initialized
+          )
+            throw new Error("Invalid imported workspace.");
+          const paths = new Set<string>(),
+            ids = new Set<string>();
+          for (const item of [...documents, ...assets]) {
+            if (safePath(item.path) !== item.path || paths.has(item.path))
+              throw new Error(
+                "Imported workspace contains invalid or duplicate paths.",
+              );
+            paths.add(item.path);
+          }
+          for (const doc of documents) {
+            if (!doc.id || ids.has(doc.id))
+              throw new Error(
+                "Imported workspace contains duplicate document IDs.",
+              );
+            ids.add(doc.id);
+          }
+          await db.workspaces.add(workspace);
+          await db.documents.bulkAdd(
+            documents.map((doc) => ({
+              ...doc,
+              workspaceId: workspace.id,
+              revision: 0,
+            })),
+          );
+          if (assets.length)
+            await db.workspaceAssets.bulkAdd(
+              assets.map((asset) => ({ ...asset, workspaceId: workspace.id })),
+            );
+        },
+      ),
     async createWorkspace(name: string, description = "", icon = "📁") {
       const workspace: LocalWorkspace = {
         id: crypto.randomUUID(),

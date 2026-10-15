@@ -1,4 +1,5 @@
 import type { LocalWorkspace, ReaderDocument } from "./types";
+import { parseRepositoryOrigin } from "./repositories/types";
 import { parseAnnotations } from "./annotations";
 export const workspaceMetadataPath = ".openmdviewer/workspace.json";
 export function workspaceMetadata(
@@ -22,6 +23,7 @@ export function workspaceMetadata(
         tags: d.tags,
         favorite: d.favorite,
         annotations: d.annotations,
+        repositorySource: parseRepositoryOrigin(d.repositorySource),
         createdAt: d.createdAt,
         updatedAt: d.updatedAt,
       })),
@@ -68,6 +70,10 @@ export function applyWorkspaceMetadata(
             .map((t: string) => t.slice(0, 80)),
         ),
       ];
+    if (record.repositorySource !== undefined) {
+      const origin = parseRepositoryOrigin(record.repositorySource);
+      if (origin) doc.repositorySource = origin;
+    }
     if (record.annotations !== undefined)
       doc.annotations = parseAnnotations(record.annotations);
     if (typeof record.favorite === "boolean") doc.favorite = record.favorite;

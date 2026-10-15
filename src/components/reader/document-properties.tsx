@@ -1,6 +1,10 @@
 "use client";
 import { Modal } from "./modal";
 import { Button } from "@/components/ui/button";
+import {
+  parseRepositoryOrigin,
+  repositoryFileURL,
+} from "@/lib/repositories/types";
 import { markdownModel } from "@/lib/markdown-model";
 import type { ReaderDocument } from "@/lib/types";
 export default function DocumentProperties({
@@ -13,6 +17,7 @@ export default function DocumentProperties({
   onClose: () => void;
 }) {
   const model = markdownModel(document.content);
+  const origin = parseRepositoryOrigin(document.repositorySource);
   const fields = Object.entries(model.frontmatter.metadata);
   return (
     <Modal title="Document properties" onClose={onClose}>
@@ -20,6 +25,25 @@ export default function DocumentProperties({
         Declared frontmatter is shown as written. Edit source to change it.
         Browser-local tags are managed separately.
       </p>
+      {origin && (
+        <section className="repository-origin">
+          <h3>GitHub source</h3>
+          <p>
+            {origin.owner}/{origin.name} · {origin.ref.kind} {origin.ref.name}
+          </p>
+          <p>Commit {origin.commit}</p>
+          <a
+            href={repositoryFileURL(origin)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View original file on GitHub
+          </a>
+          <p>
+            This is an editable local copy. Browser edits do not change GitHub.
+          </p>
+        </section>
+      )}
       {model.frontmatter.error && (
         <p role="alert" className="frontmatter-error">
           {model.frontmatter.error}

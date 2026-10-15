@@ -104,6 +104,7 @@ import type {
   TextQuote,
 } from "@/lib/types";
 const ConversionDialog = lazy(() => import("./conversion-dialog"));
+const RepositoryDialog = lazy(() => import("./repository-dialog"));
 const DocxExportDialog = lazy(() => import("./docx-export-dialog"));
 const SiteExportDialog = lazy(() => import("./site-export-dialog"));
 const LocalDirectoryDialog = lazy(() => import("./local-directory-dialog"));
@@ -123,6 +124,7 @@ type DialogName =
   | "exportDocx"
   | "exportSite"
   | "convertImport"
+  | "repository"
   | "localDirectory"
   | "localFile"
   | "tags"
@@ -754,6 +756,9 @@ export default function Workspace() {
         case "files":
           filesRef.current?.click();
           break;
+        case "repository":
+          setDialog("repository");
+          break;
         case "folder":
           setDialog("localDirectory");
           break;
@@ -1110,6 +1115,12 @@ export default function Workspace() {
                   onClick={() => setDialog("localFile")}
                 >
                   <HardDrive size={15} />
+                </IconButton>
+                <IconButton
+                  label="Browse GitHub repository"
+                  onClick={() => setDialog("repository")}
+                >
+                  <Github size={15} />
                 </IconButton>
                 <IconButton
                   label="Open folder"
@@ -2098,6 +2109,37 @@ export default function Workspace() {
             }}
             onCommand={(id) => void runCommand(id)}
             onOpen={(id, hit) => void openSearchResult(id, hit)}
+          />
+        </Suspense>
+      )}
+      {dialog === "repository" && (
+        <Suspense
+          fallback={
+            <Modal
+              title="Browse GitHub repository"
+              onClose={() => setDialog(null)}
+            >
+              <p role="status">Loading repository browser…</p>
+            </Modal>
+          }
+        >
+          <RepositoryDialog
+            flush={flushEdit}
+            onBusy={setLocalFileBusy}
+            onClose={() => setDialog(null)}
+            onImported={async (id, first) => {
+              await reloadWorkspaces();
+              if (await switchWorkspace(id)) {
+                setHistory([]);
+                setCollection("all");
+                setFileFilter("");
+                openDocument(first);
+              } else
+                notify(
+                  "The repository snapshot was imported. Select its workspace after resolving pending browser changes.",
+                );
+              setDialog(null);
+            }}
           />
         </Suspense>
       )}

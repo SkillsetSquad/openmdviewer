@@ -8,6 +8,11 @@ export const commands = [
     quick: true,
   },
   {
+    id: "repository",
+    label: "Browse GitHub repository",
+    keywords: "remote public private branch tag readme import git",
+  },
+  {
     id: "folder",
     label: "Open local folder",
     keywords: "import directory files",

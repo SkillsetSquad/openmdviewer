@@ -1,4 +1,5 @@
 export interface ReaderDocument {
+  repositorySource?: import("./repositories/types").RepositoryOrigin;
   workspaceId?: string;
   revision?: number;
   deletedAt?: number;

@@ -55,6 +55,7 @@ const icons = {
   exportZip: ArrowDownToLine,
   exportSite: BookOpen,
   exportDocx: FileText,
+  repository: BookOpen,
   workspaces: FolderOpen,
   theme: Moon,
   health: ShieldCheck,
