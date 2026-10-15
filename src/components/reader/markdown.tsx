@@ -19,6 +19,7 @@ import {
   rehypeHeadingAliases,
 } from "@/lib/markdown-pipeline";
 import { ImageGallery, ImageRenderer } from "./image-gallery";
+import { MediaResources, VideoRenderer, AudioRenderer } from "./media-player";
 const Diagram = lazy(() => import("./diagram"));
 
 // A stable component type preserves table state when document props update.
@@ -79,6 +80,10 @@ export const Markdown = memo(function Markdown({
       </a>
     ),
     img: ImageRenderer,
+    video: VideoRenderer,
+    audio: AudioRenderer,
+    source: () => null,
+    track: () => null,
     blockquote: ({ children, node }) => {
       const type = String(node?.properties.dataCallout || "");
       const tip = ["tip", "success"].includes(type);
@@ -103,34 +108,36 @@ export const Markdown = memo(function Markdown({
     table: TableRenderer,
   };
   return (
-    <ImageGallery
-      content={galleryContent}
-      sourcePath={sourcePath}
-      assets={assetURLs}
-    >
-      {parsed.error && (
-        <p className="frontmatter-error" role="alert">
-          Frontmatter could not be parsed: {parsed.error}
-        </p>
-      )}
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath, remarkReaderExtensions]}
-        rehypePlugins={[
-          rehypeRaw,
-          rehypeRememberAnchors,
-          [rehypeSanitize, markdownSchema],
-          rehypeRepairAnchors,
-          [rehypeSlug, { prefix: "user-content-" }],
-          rehypeHeadingAliases,
-          [rehypeKatex, { strict: "warn", trust: false }],
-        ]}
-        components={components}
-        urlTransform={(url) =>
-          /^(?:javascript|vbscript|data):/i.test(url.trim()) ? "" : url
-        }
+    <MediaResources path={sourcePath} assets={assetURLs}>
+      <ImageGallery
+        content={galleryContent}
+        sourcePath={sourcePath}
+        assets={assetURLs}
       >
-        {parsed.body}
-      </ReactMarkdown>
-    </ImageGallery>
+        {parsed.error && (
+          <p className="frontmatter-error" role="alert">
+            Frontmatter could not be parsed: {parsed.error}
+          </p>
+        )}
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath, remarkReaderExtensions]}
+          rehypePlugins={[
+            rehypeRaw,
+            rehypeRememberAnchors,
+            [rehypeSanitize, markdownSchema],
+            rehypeRepairAnchors,
+            [rehypeSlug, { prefix: "user-content-" }],
+            rehypeHeadingAliases,
+            [rehypeKatex, { strict: "warn", trust: false }],
+          ]}
+          components={components}
+          urlTransform={(url) =>
+            /^(?:javascript|vbscript|data):/i.test(url.trim()) ? "" : url
+          }
+        >
+          {parsed.body}
+        </ReactMarkdown>
+      </ImageGallery>
+    </MediaResources>
   );
 });

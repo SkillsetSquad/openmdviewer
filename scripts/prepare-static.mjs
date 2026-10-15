@@ -27,7 +27,7 @@ await writeFile(
   ),
 );
 const csp =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: https: http:; font-src 'self' data:; connect-src 'self' blob: https:; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'";
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: https: http:; media-src 'self' blob: https: http:; font-src 'self' data:; connect-src 'self' blob: https:; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'";
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   return (

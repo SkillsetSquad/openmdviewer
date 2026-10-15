@@ -12,8 +12,19 @@ import type { Root as HtmlRoot } from "hast";
 import type { VFile } from "vfile";
 export const markdownSchema = {
   ...defaultSchema,
+  tagNames: [
+    ...(defaultSchema.tagNames || []),
+    "audio",
+    "video",
+    "source",
+    "track",
+  ],
   attributes: {
     ...defaultSchema.attributes,
+    audio: ["src", "title"],
+    video: ["src", "poster", "title"],
+    source: ["src", "type"],
+    track: ["src", "kind", "label", "srcLang", "default"],
     blockquote: [
       ...(defaultSchema.attributes?.blockquote || []),
       "dataCallout",
@@ -23,6 +34,7 @@ export const markdownSchema = {
     ...defaultSchema.protocols,
     href: ["http", "https", "mailto", "tel", "wiki"],
     src: ["http", "https", "asset", "blob"],
+    poster: ["http", "https"],
   },
 };
 export function remarkReaderExtensions() {

@@ -3451,3 +3451,107 @@ kbd {
     grid-column: 1 / -1;
   }
 }
+
+/* Native media playback keeps imported files local and remote resources gated. */
+.media-player {
+  margin: 1.1em 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--code-bg);
+}
+.media-player video,
+.media-player audio {
+  display: block;
+  width: 100%;
+  max-height: 65dvh;
+  border-radius: 5px;
+}
+.media-player video {
+  background: #000;
+}
+.media-player-tools {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font: 11px/1.6 var(--font-geist-sans);
+}
+.media-player-tools label,
+.media-source-select {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.media-player select {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: var(--app-bg);
+  color: var(--foreground);
+  max-width: 100%;
+}
+.media-player-tools button,
+.media-resource-block button,
+.media-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: 11px/1.6 var(--font-geist-sans);
+}
+.media-source-select {
+  font: 11px/1.6 var(--font-geist-sans);
+  margin-bottom: 10px;
+}
+.media-source-select select {
+  min-width: 0;
+  flex: 1;
+}
+.media-resource-block {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  font: 11px/1.7 var(--font-geist-sans);
+  color: var(--muted-foreground);
+  margin: 9px 0 !important;
+  overflow-wrap: anywhere;
+}
+.media-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  font: 10px/1.7 var(--font-geist-sans);
+  margin: 12px 0 0;
+}
+.media-metadata dt {
+  color: var(--muted-foreground);
+}
+.media-metadata dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.media-player-status {
+  font: 11px/1.7 var(--font-geist-sans);
+  color: var(--muted-foreground);
+  margin: 8px 0 0 !important;
+}
+.audio-captions {
+  white-space: pre-wrap;
+  background: var(--elevated);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font: 13px/1.6 var(--font-geist-sans);
+}
+.media-download {
+  margin-top: 10px;
+}
+@media print {
+  .media-player {
+    display: none !important;
+  }
+}
