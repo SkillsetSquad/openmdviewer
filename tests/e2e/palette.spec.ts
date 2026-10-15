@@ -212,50 +212,56 @@ test("palette invokes file import, Markdown and ZIP downloads, clipboard, and pr
     .toEqual({ hasDialog: false, hasDocument: true });
 });
 
-test("commands remain usable without a document index and document-only actions stay hidden in an empty workspace", async ({
-  page,
-}) => {
-  await page.route("**/search-worker.js", (route) => route.abort());
-  await page.reload();
-  const input = await openPalette(page);
-  await input.fill("configuraton");
-  await expect(page.getByText(/Document search is unavailable/)).toBeVisible();
-  await input.fill("> settings");
-  await page
-    .getByRole("option", { name: "Reading settings", exact: true })
-    .click();
-  await expect(
-    page.getByRole("dialog", { name: "Make yourself at home" }),
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
-  await command(page, "workspaces", "Manage workspaces");
-  await page
-    .getByRole("button", { name: "New workspace", exact: true })
-    .click();
-  await page
-    .getByRole("textbox", { name: "Workspace name", exact: true })
-    .fill("Empty palette fixture");
-  await page
-    .getByRole("button", { name: "Create workspace", exact: true })
-    .click();
-  await expect(page.getByText("0 documents, all local")).toBeVisible();
-  const empty = await openPalette(page);
-  await empty.fill(">");
-  await expect(
-    page.getByRole("option", { name: "Copy Markdown", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("option", { name: "Source view", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("option", { name: "Create document", exact: true }),
-  ).toBeVisible();
-  await empty.fill("> zzzz-unavailable-command");
-  await expect(page.getByText(/No matching commands/)).toBeVisible();
-  await empty.press("Enter");
-  await expect(
-    page.getByRole("dialog", { name: "Search your workspace", exact: true }),
-  ).toBeVisible();
+test.describe("without a document search worker", () => {
+  // A service-worker cache must not satisfy the intentionally aborted request.
+  test.use({ serviceWorkers: "block" });
+  test("commands remain usable without a document index and document-only actions stay hidden in an empty workspace", async ({
+    page,
+  }) => {
+    await page.route("**/search-worker.js", (route) => route.abort());
+    await page.reload();
+    const input = await openPalette(page);
+    await input.fill("configuraton");
+    await expect(
+      page.getByText(/Document search is unavailable/),
+    ).toBeVisible();
+    await input.fill("> settings");
+    await page
+      .getByRole("option", { name: "Reading settings", exact: true })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Make yourself at home" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await command(page, "workspaces", "Manage workspaces");
+    await page
+      .getByRole("button", { name: "New workspace", exact: true })
+      .click();
+    await page
+      .getByRole("textbox", { name: "Workspace name", exact: true })
+      .fill("Empty palette fixture");
+    await page
+      .getByRole("button", { name: "Create workspace", exact: true })
+      .click();
+    await expect(page.getByText("0 documents, all local")).toBeVisible();
+    const empty = await openPalette(page);
+    await empty.fill(">");
+    await expect(
+      page.getByRole("option", { name: "Copy Markdown", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("option", { name: "Source view", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("option", { name: "Create document", exact: true }),
+    ).toBeVisible();
+    await empty.fill("> zzzz-unavailable-command");
+    await expect(page.getByText(/No matching commands/)).toBeVisible();
+    await empty.press("Enter");
+    await expect(
+      page.getByRole("dialog", { name: "Search your workspace", exact: true }),
+    ).toBeVisible();
+  });
 });
 
 test("mobile commands reveal backlinks and keyboard search still opens a document", async ({
