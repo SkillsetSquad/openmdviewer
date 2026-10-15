@@ -1,3 +1,4 @@
+import type { SearchSuggestion } from "./search-suggestions";
 export interface SearchOptions {
   caseSensitive: boolean;
   wholeWord: boolean;
@@ -28,6 +29,7 @@ export interface SearchHit {
   location?: SearchLocation;
 }
 export interface SearchPage {
+  suggestions?: SearchSuggestion[];
   error?: string;
   hits: SearchHit[];
   total: number;

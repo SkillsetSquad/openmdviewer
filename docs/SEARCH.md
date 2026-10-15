@@ -30,6 +30,20 @@ Opening a prose result reveals its enclosing callouts, scrolls to the matching p
 
 Title/path/tag-only matches can open the document without a body location. A heading-only match opens the corresponding section. Search does not rewrite Markdown or save back to original files.
 
+## Filter suggestions
+
+Start typing `tag:`, `path:`, `heading:`, `status:`, or `type:` to see up to eight matching values from this workspace. Suggestions come from the worker's current index: actual tags, ancestor folders, heading text, declared statuses, and supported file types. Each count is the number of workspace documents containing that exact value, independently of other filters already entered. Suggestions use case-insensitive prefixes, rank common values first, and update after document edits/imports/removals. They do not predict words from document bodies.
+
+Arrow keys and Enter select a suggestion; clicking one also works. It fills a quoted filter value, preserves earlier query text, and keeps focus in search. Values containing double quotes, line breaks, or more than 200 characters are omitted because they cannot be represented faithfully within the bounded query syntax.
+
+## Recent searches
+
+Opening a document result remembers its nonempty query and Fuzzy/Literal, Match case, and Whole words settings. **Remember search** also saves a query explicitly, including a query with no results. Typing and closing the palette does not save draft queries; command-only queries are not saved.
+
+Expand **Recent searches** to restore, remove, or clear queries. Restoring resets pagination and restores matching options; it does not open a document automatically. Repeated queries with the same options move to the top, and distinct options remain separate entries. The newest 30 are retained per workspace.
+
+History is stored in this browser's IndexedDB, isolated by workspace, and available offline. Other tabs on the same origin see updates. Removing or clearing history affects only that workspace's queries. It does not alter Markdown, annotations, revision snapshots, or media. Search history is not included in workspace ZIP exports, synced across devices, or sent to a service. Clearing site data removes it. If browser storage fails, document search remains usable and the app reports the history failure.
+
 ## Current boundaries
 
-Regular-expression queries, saved search history, cross-workspace search, and a list of every occurrence remain roadmap work. Regex punctuation is searchable as ordinary text in Literal mode; no user-supplied regular expression runs in the document worker. If the index worker is unavailable, the palette explains the failure and command actions remain available.
+Regular-expression queries, cross-workspace search, and a list of every occurrence remain roadmap work. Regex punctuation is searchable as ordinary text in Literal mode; no user-supplied regular expression runs in the document worker. If the index worker is unavailable, the palette explains the failure and command actions remain available.

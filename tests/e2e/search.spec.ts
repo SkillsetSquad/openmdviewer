@@ -244,3 +244,301 @@ test("all result pages are reachable with exact counts and the final page opens 
     page.getByRole("navigation", { name: "Search result pages", exact: true }),
   ).toContainText("1–50 of 125 documents");
 });
+
+test("search history remembers explicit actions and restores options after reload without saving drafts", async ({
+  page,
+}) => {
+  await load(page, [
+    { name: "History.md", content: "# History\n\nCaseNeedle and caseneedle." },
+  ]);
+  let dialog = await search(page, "unexecuted private draft");
+  await page.keyboard.press("Escape");
+  dialog = await search(page, "CaseNeedle");
+  await dialog.getByLabel("Match case", { exact: true }).check();
+  await dialog.getByLabel("Whole words", { exact: true }).check();
+  await dialog
+    .getByRole("group", { name: "Documents", exact: true })
+    .getByRole("option")
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "History", exact: true }),
+  ).toBeVisible();
+  dialog = await search(page, "");
+  await dialog.locator(".recent-searches > summary").click();
+  const restore = dialog.getByRole("button", {
+    name: "Restore search: CaseNeedle (Literal · Match case · Whole words)",
+    exact: true,
+  });
+  await expect(restore).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: /Restore search: unexecuted/ }),
+  ).toHaveCount(0);
+  await restore.click();
+  await expect(
+    dialog.getByRole("combobox", {
+      name: "Search documents and commands",
+      exact: true,
+    }),
+  ).toHaveValue("CaseNeedle");
+  await expect(dialog.getByLabel("Match case", { exact: true })).toBeChecked();
+  await expect(dialog.getByLabel("Whole words", { exact: true })).toBeChecked();
+  await expect(
+    dialog.getByRole("combobox", { name: "Document matching" }),
+  ).toHaveValue("literal");
+  await expect(
+    dialog.getByRole("button", { name: "Search remembered", exact: true }),
+  ).toBeDisabled();
+  await dialog
+    .getByRole("combobox", {
+      name: "Search documents and commands",
+      exact: true,
+    })
+    .fill("no matches but remember this");
+  await dialog
+    .getByRole("button", { name: "Remember search", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search:/ }),
+  ).toHaveCount(2);
+  await dialog
+    .getByRole("button", { name: /^Remove search: CaseNeedle/ })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search:/ }),
+  ).toHaveCount(1);
+  await dialog
+    .getByRole("button", { name: "Clear search history", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search:/ }),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByText("No recent searches yet.", { exact: false }),
+  ).toBeVisible();
+});
+
+test("recent searches update across tabs and stay isolated when switching workspaces", async ({
+  page,
+  context,
+}) => {
+  await load(page, [
+    { name: "Private.md", content: "# Private\n\nprivateNeedle" },
+  ]);
+  let dialog = await search(page, "privateNeedle");
+  await dialog
+    .getByRole("button", { name: "Remember search", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Search remembered", exact: true }),
+  ).toBeDisabled();
+  const other = await context.newPage();
+  await other.goto("./");
+  await expect(
+    other.getByRole("heading", { name: "Private", exact: true }),
+  ).toBeVisible();
+  const second = await search(other, "second-tab query");
+  await second.locator(".recent-searches > summary").click();
+  await expect(
+    second.getByRole("button", { name: /^Restore search: privateNeedle/ }),
+  ).toBeVisible();
+  await second
+    .getByRole("button", { name: "Remember search", exact: true })
+    .click();
+  await dialog.locator(".recent-searches > summary").click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search:/ }),
+  ).toHaveCount(2);
+  await second
+    .getByRole("button", { name: "Clear search history", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search:/ }),
+  ).toHaveCount(0);
+  await other.close();
+  await dialog
+    .getByRole("button", { name: "Remember search", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search: privateNeedle/ }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Manage workspaces", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "New workspace", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Workspace name", exact: true })
+    .fill("Separate search workspace");
+  await page
+    .getByRole("button", { name: "Create workspace", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "A little space for your words." }),
+  ).toBeVisible();
+  dialog = await search(page, "other-workspace query");
+  await dialog.locator(".recent-searches > summary").click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search:/ }),
+  ).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Remember search", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search:/ }),
+  ).toHaveCount(1);
+  await dialog
+    .getByRole("button", { name: "Clear search history", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("combobox", { name: "Current workspace" })
+    .selectOption("default");
+  await expect(
+    page.getByRole("heading", { name: "Private", exact: true }),
+  ).toBeVisible();
+  dialog = await search(page, "");
+  await dialog.locator(".recent-searches > summary").click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search: privateNeedle/ }),
+  ).toBeVisible();
+});
+
+test("filter suggestions use real workspace values and support keyboard selection on mobile and offline", async ({
+  page,
+  context,
+}) => {
+  await load(page, [
+    {
+      name: "Suggestions.md",
+      content:
+        '---\nstatus: approved\ntags: ["operations team", "opsec"]\n---\n# Suggestions\n\n## Authentication guide\n\nLocal reference.',
+    },
+    {
+      name: "Other.md",
+      content:
+        '---\nstatus: draft\ntags: ["operations team"]\n---\n# Other\n\n## Authentication guide',
+    },
+  ]);
+  let dialog = await search(page, "tag:op");
+  const suggestions = dialog.getByRole("group", {
+    name: "Filter suggestions",
+    exact: true,
+  });
+  await expect(suggestions.getByRole("option")).toHaveCount(2);
+  const first = suggestions.getByRole("option").first();
+  await expect(first).toContainText("operations team");
+  await expect(first).toContainText("2 workspace documents with this value");
+  const input = dialog.getByRole("combobox", {
+    name: "Search documents and commands",
+    exact: true,
+  });
+  await expect(input).toHaveAttribute(
+    "aria-activedescendant",
+    (await first.getAttribute("id"))!,
+  );
+  await input.press("Enter");
+  await expect(input).toHaveValue('tag:"operations team"');
+  await expect(input).toBeFocused();
+  await expect(
+    dialog
+      .getByRole("group", { name: "Documents", exact: true })
+      .getByRole("option"),
+  ).toHaveCount(2);
+  await input.fill('heading:"Auth');
+  await expect(suggestions.getByRole("option")).toHaveCount(1);
+  await suggestions.getByRole("option").click();
+  await expect(input).toHaveValue('heading:"Authentication guide"');
+  await dialog
+    .getByRole("button", { name: "Remember search", exact: true })
+    .click();
+  await dialog.locator(".recent-searches > summary").click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await input.fill("status:a");
+  await expect(suggestions.getByRole("option")).toContainText("approved");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    (await new AxeBuilder({ page }).analyze()).violations.filter((v) =>
+      ["serious", "critical"].includes(v.impact || ""),
+    ),
+  ).toEqual([]);
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await expect
+    .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
+    .toBe(true);
+  await context.setOffline(true);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Suggestions", exact: true }),
+  ).toBeVisible();
+  dialog = await search(page, "status:a");
+  await expect(
+    dialog
+      .getByRole("group", { name: "Filter suggestions", exact: true })
+      .getByRole("option"),
+  ).toContainText("approved");
+  await dialog.locator(".recent-searches > summary").click();
+  await expect(
+    dialog.getByRole("button", { name: /^Restore search: heading:/ }),
+  ).toBeVisible();
+});
+
+test("a history storage failure is reported without blocking a document result", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const original = IDBDatabase.prototype.transaction;
+    Object.defineProperty(IDBDatabase.prototype, "transaction", {
+      configurable: true,
+      value: function (
+        this: IDBDatabase,
+        ...args: [
+          string | string[],
+          IDBTransactionMode?,
+          IDBTransactionOptions?,
+        ]
+      ) {
+        const names =
+          typeof args[0] === "string" ? [args[0]] : Array.from(args[0]);
+        if (names.includes("searchHistory") && args[1] === "readwrite")
+          throw new DOMException(
+            "History write unavailable",
+            "QuotaExceededError",
+          );
+        return Reflect.apply(original, this, args);
+      },
+    });
+  });
+  await load(page, [
+    { name: "Resilient.md", content: "# Resilient search\n\nresilientNeedle" },
+  ]);
+  const dialog = await search(page, "resilientNeedle");
+  await expect(
+    dialog
+      .getByRole("group", { name: "Documents", exact: true })
+      .getByRole("option"),
+  ).toHaveCount(1);
+
+  await dialog
+    .getByRole("group", { name: "Documents", exact: true })
+    .getByRole("option")
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByText(
+      "Search history could not be updated in browser storage. Document search still works.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.toString()))
+    .toBe("resilientNeedle");
+});

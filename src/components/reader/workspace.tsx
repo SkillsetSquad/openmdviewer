@@ -66,6 +66,7 @@ import { Markdown } from "./markdown";
 import { useAnnotations } from "@/hooks/use-annotations";
 import { captureQuote, locateQuote, readingText } from "@/lib/annotation-dom";
 import { parseAnnotations, annotationExport } from "@/lib/annotations";
+import { useSearchHistory } from "@/hooks/use-search-history";
 import { useLocalSearch } from "@/hooks/use-local-search";
 import { useAppUpdates } from "@/hooks/use-app-updates";
 import { useWorkspaceSession } from "@/hooks/use-workspace-session";
@@ -176,6 +177,11 @@ export default function Workspace() {
     resolvingConflict,
   } = session;
   const [dialog, setDialog] = useState<DialogName>(null);
+  const recentSearches = useSearchHistory(
+    workspaceId,
+    dialog === "search",
+    notify,
+  );
   const [query, setQueryValue] = useState("");
   const [searchOptions, setSearchOptions] =
     useState<SearchOptions>(defaultSearchOptions);
@@ -404,6 +410,8 @@ export default function Workspace() {
       return;
     }
     hit = currentHit || undefined;
+    if (!query.trimStart().startsWith(">"))
+      await recentSearches.remember(query, searchOptions);
     openDocument(id);
     setDialog(null);
     if (hit?.location && (hit.location.sourceOnly || mode !== "read")) {
@@ -1967,6 +1975,17 @@ export default function Workspace() {
           <CommandPalette
             query={query}
             onQuery={setQuery}
+            history={recentSearches.items}
+            historyError={recentSearches.error}
+            onRemember={() =>
+              void recentSearches.remember(query, searchOptions)
+            }
+            onRemoveHistory={(key) => void recentSearches.remove(key)}
+            onClearHistory={() => void recentSearches.clear()}
+            onRestoreHistory={(entry) => {
+              setQuery(entry.query);
+              setSearchOptions(entry.options);
+            }}
             options={searchOptions}
             onOptions={(value) => {
               setSearchOptions(value);

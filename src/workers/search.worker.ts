@@ -28,11 +28,14 @@ self.onmessage = (
     } else
       self.postMessage({
         request: event.data.request,
-        page: search.find(
-          event.data.query || "",
-          event.data.options,
-          event.data.offset,
-        ),
+        page: {
+          ...search.find(
+            event.data.query || "",
+            event.data.options,
+            event.data.offset,
+          ),
+          suggestions: search.suggest(event.data.query || ""),
+        },
       });
   } catch {
     self.postMessage({ request: event.data.request, error: true });

@@ -35,6 +35,11 @@ import type {
   SearchOptions,
   SearchHit,
 } from "@/lib/search-results";
+import {
+  searchHistoryEntry,
+  searchOptionsLabel,
+  type RecentSearch,
+} from "@/lib/search-history";
 import { fileName } from "@/lib/paths";
 
 const icons = {
@@ -78,7 +83,19 @@ export default function CommandPalette({
   options,
   onOptions,
   onPage,
+  history,
+  historyError,
+  onRemember,
+  onRemoveHistory,
+  onClearHistory,
+  onRestoreHistory,
 }: {
+  history: RecentSearch[];
+  historyError?: string;
+  onRemember: () => void;
+  onRemoveHistory: (key: string) => void;
+  onClearHistory: () => void;
+  onRestoreHistory: (entry: RecentSearch) => void;
   query: string;
   onQuery: (query: string) => void;
   documents: ReaderDocument[];
@@ -105,7 +122,11 @@ export default function CommandPalette({
   );
   const only = query.trimStart().startsWith(">");
   const visibleDocuments = only ? [] : documents;
+  const suggestions = only ? [] : page?.suggestions || [];
+  const historyEntry = searchHistoryEntry(query, options);
+  const remembered = history.some((entry) => entry.key === historyEntry?.key);
   const keys = [
+    ...suggestions.map((_, index) => `suggestion:${index}`),
     ...matches.map((command) => `command:${command.id}`),
     ...visibleDocuments.map((doc) => `document:${doc.id}`),
   ];
@@ -123,7 +144,12 @@ export default function CommandPalette({
   }, [activeId, selected]);
   const activate = (key: string | undefined) => {
     if (!key) return;
-    if (key.startsWith("command:")) onCommand(key.slice(8) as CommandId);
+    if (key.startsWith("suggestion:")) {
+      const suggestion = suggestions[Number(key.slice(11))];
+      if (suggestion) onQuery(suggestion.query);
+      setSelectedKey(null);
+      input.current?.focus();
+    } else if (key.startsWith("command:")) onCommand(key.slice(8) as CommandId);
     else onOpen(key.slice(9), hitMap.get(key.slice(9)));
   };
   return (
@@ -227,6 +253,72 @@ export default function CommandPalette({
           </label>
         </div>
       )}
+      {!only && (
+        <div className="search-memory">
+          {historyEntry && (
+            <button
+              type="button"
+              className="remember-search"
+              disabled={remembered}
+              onClick={onRemember}
+            >
+              <History size={13} aria-hidden="true" />{" "}
+              {remembered ? "Search remembered" : "Remember search"}
+            </button>
+          )}
+          <details className="recent-searches">
+            <summary>Recent searches ({history.length})</summary>
+            <p>
+              Up to 30 searches, saved only in this browser and workspace.
+              Opening a document result remembers its query.
+            </p>
+            {historyError && <p role="status">{historyError}</p>}
+            {!history.length && !historyError && (
+              <p>
+                No recent searches yet. Type a query and choose Remember search.
+              </p>
+            )}
+            {!!history.length && (
+              <>
+                <button
+                  type="button"
+                  className="clear-search-history"
+                  onClick={onClearHistory}
+                >
+                  Clear search history
+                </button>
+                <ul>
+                  {history.map((entry) => (
+                    <li key={entry.key}>
+                      <button
+                        type="button"
+                        className="restore-search"
+                        aria-label={`Restore search: ${entry.query} (${searchOptionsLabel(entry.options)})`}
+                        onClick={() => {
+                          onRestoreHistory(entry);
+                          setSelectedKey(null);
+                          input.current?.focus();
+                        }}
+                      >
+                        <span>{entry.query}</span>
+                        <small>{searchOptionsLabel(entry.options)}</small>
+                      </button>
+                      <button
+                        type="button"
+                        className="remove-search"
+                        aria-label={`Remove search: ${entry.query} (${searchOptionsLabel(entry.options)})`}
+                        onClick={onRemoveHistory.bind(null, entry.key)}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </details>
+        </div>
+      )}
       <div
         className="palette-results"
         id={listId}
@@ -234,6 +326,39 @@ export default function CommandPalette({
         aria-label="Documents and commands"
         aria-busy={searching && !only}
       >
+        {!!suggestions.length && (
+          <div role="group" aria-label="Filter suggestions">
+            <div className="result-label" aria-hidden="true">
+              WORKSPACE FILTER VALUES
+            </div>
+            {suggestions.map((suggestion, index) => {
+              const key = `suggestion:${index}`;
+              return (
+                <button
+                  role="option"
+                  tabIndex={-1}
+                  id={`${listId}-${index}`}
+                  key={suggestion.query}
+                  aria-selected={selected === key}
+                  className={`command-result filter-suggestion ${selected === key ? "palette-active" : ""}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseMove={() => setSelectedKey(key)}
+                  onClick={() => activate(key)}
+                >
+                  <Search size={16} aria-hidden="true" />
+                  <span>
+                    {suggestion.filter}:<strong>{suggestion.value}</strong>
+                    <small>
+                      {suggestion.count} workspace document
+                      {suggestion.count === 1 ? "" : "s"} with this value
+                    </small>
+                  </span>
+                  <ChevronRight size={14} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        )}
         {!!matches.length && (
           <div role="group" aria-label="Commands">
             <div className="result-label" aria-hidden="true">
@@ -248,7 +373,7 @@ export default function CommandPalette({
                 <button
                   role="option"
                   tabIndex={-1}
-                  id={`${listId}-${index}`}
+                  id={`${listId}-${suggestions.length + index}`}
                   aria-selected={selected === key}
                   className={`command-result ${selected === key ? "palette-active" : ""}`}
                   key={key}
@@ -279,7 +404,7 @@ export default function CommandPalette({
                 <button
                   role="option"
                   tabIndex={-1}
-                  id={`${listId}-${matches.length + index}`}
+                  id={`${listId}-${suggestions.length + matches.length + index}`}
                   aria-selected={selected === key}
                   className={`search-result ${selected === key ? "palette-active" : ""}`}
                   key={key}
@@ -393,7 +518,7 @@ export default function CommandPalette({
       </div>
       <p className="palette-hint" id={hintId}>
         ↑ / ↓ to navigate · Enter to choose · Escape to close · Type &gt; to
-        search actions only.
+        search actions only. Tab to manage recent searches.
       </p>
       <footer className="palette-footer">
         <span>

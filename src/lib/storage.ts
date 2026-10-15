@@ -1,10 +1,16 @@
-import Dexie, { type EntityTable } from "dexie";
+import Dexie, { type EntityTable, type Table } from "dexie";
 import type {
   ReaderDocument,
   ReaderAsset,
   LocalWorkspace,
   DocumentSnapshot,
 } from "./types";
+import {
+  searchHistoryEntry,
+  searchHistoryLimit,
+  type RecentSearch,
+} from "./search-history";
+import type { SearchOptions } from "./search-results";
 export class DocumentConflict extends Error {
   constructor(public current: ReaderDocument) {
     super(
@@ -28,6 +34,7 @@ export function createStorage(name = "openmdviewer") {
     workspaceAssets: EntityTable<ReaderAsset, "path">;
     workspaces: EntityTable<LocalWorkspace, "id">;
     snapshots: EntityTable<DocumentSnapshot, "id">;
+    searchHistory: Table<RecentSearch, [string, string]>;
   };
   db.version(1).stores({ documents: "id, path, updatedAt, favorite" });
   db.version(2).stores({
@@ -59,6 +66,7 @@ export function createStorage(name = "openmdviewer") {
         initialized: (await tx.table("documents").count()) > 0,
       });
     });
+  db.version(4).stores({ searchHistory: "[workspaceId+key], workspaceId" });
   const scoped = (id = "default") =>
     db.documents.where("workspaceId").equals(id);
   async function ensurePath(doc: ReaderDocument) {
@@ -95,6 +103,41 @@ export function createStorage(name = "openmdviewer") {
   }
   const api = {
     close: () => db.close(),
+    searchHistory: async (workspaceId: string) => {
+      const items = await db.searchHistory
+        .where("workspaceId")
+        .equals(workspaceId)
+        .toArray();
+      return items.sort(
+        (a, b) => b.usedAt - a.usedAt || a.key.localeCompare(b.key),
+      );
+    },
+    rememberSearch: async (
+      workspaceId: string,
+      query: string,
+      options: SearchOptions,
+    ) => {
+      const entry = searchHistoryEntry(query, options);
+      if (!entry) return;
+      await db.transaction("rw", db.searchHistory, async () => {
+        const previous = await api.searchHistory(workspaceId);
+        await db.searchHistory.put({
+          ...entry,
+          workspaceId,
+          usedAt: Math.max(Date.now(), (previous[0]?.usedAt || 0) + 1),
+        });
+        const expired = previous
+          .filter((item) => item.key !== entry.key)
+          .slice(searchHistoryLimit - 1);
+        await db.searchHistory.bulkDelete(
+          expired.map((item) => [workspaceId, item.key]),
+        );
+      });
+    },
+    removeSearch: (workspaceId: string, key: string) =>
+      db.searchHistory.delete([workspaceId, key]),
+    clearSearchHistory: (workspaceId: string) =>
+      db.searchHistory.where("workspaceId").equals(workspaceId).delete(),
     async initialize(examples: ReaderDocument[], selectedId = "default") {
       await db.transaction("rw", db.documents, db.workspaces, async () => {
         let workspace = await db.workspaces.get("default");

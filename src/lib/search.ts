@@ -1,3 +1,4 @@
+import { filterSuggestions } from "./search-suggestions";
 import MiniSearch from "minisearch";
 import {
   defaultSearchOptions,
@@ -68,6 +69,9 @@ export class LocalSearch {
   }
   navigation() {
     return workspaceNavigation([...this.documents.values()], this.models);
+  }
+  suggest(query: string) {
+    return filterSuggestions(query, this.documents.values());
   }
   search(query: string): string[] {
     return this.find(query).hits.map((hit) => hit.id);
