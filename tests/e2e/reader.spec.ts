@@ -210,7 +210,9 @@ test("sorts and filters tables without changing Markdown and exports safe CSV", 
   await expect(
     page.getByRole("heading", { name: "Table fixture" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Count", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sort by Count", exact: true })
+    .click();
   await expect(page.locator("tbody tr").first()).toContainText("Alpha");
   await page.getByRole("textbox", { name: "Filter table rows" }).fill("Zebra");
   await expect(page.locator("tbody tr")).toHaveCount(1);

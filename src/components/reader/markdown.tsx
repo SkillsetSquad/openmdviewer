@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Local and explicitly consented media use native elements without a proxy. */
 "use client";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -87,7 +87,12 @@ function SafeImage({ src, alt }: { src?: string; alt?: string }) {
   );
 }
 
-export function Markdown({
+// A stable component type preserves table state when document props update.
+const TableRenderer: Components["table"] = ({ children }) => (
+  <InteractiveTable>{children}</InteractiveTable>
+);
+
+export const Markdown = memo(function Markdown({
   content,
   onLink,
   assetURLs = {},
@@ -167,7 +172,7 @@ export function Markdown({
         </blockquote>
       );
     },
-    table: ({ children }) => <InteractiveTable>{children}</InteractiveTable>,
+    table: TableRenderer,
   };
   return (
     <>
@@ -196,4 +201,4 @@ export function Markdown({
       </ReactMarkdown>
     </>
   );
-}
+});

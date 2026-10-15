@@ -3004,3 +3004,288 @@ kbd {
 .palette-feedback:empty {
   display: none;
 }
+
+/* Table controls affect the view only; all source rows return for printing. */
+.interactive-table .table-tools {
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  padding: 6px 8px;
+}
+.interactive-table .table-tools label {
+  min-width: 120px;
+}
+.interactive-table .table-tools button {
+  min-width: 28px;
+  min-height: 28px;
+  justify-content: center;
+  border-radius: 4px;
+}
+.interactive-table .table-tools button[aria-pressed="true"] {
+  background: var(--selection-bg);
+  color: var(--foreground);
+}
+.interactive-table .table-tools button:hover {
+  background: var(--elevated-hover);
+}
+.interactive-table .table-scroll {
+  max-height: min(65dvh, 650px);
+  overflow: auto;
+}
+.interactive-table table {
+  max-width: none;
+}
+.interactive-table td,
+.interactive-table th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.interactive-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--elevated);
+}
+.interactive-table th {
+  position: relative;
+  padding-right: 27px;
+}
+.interactive-table th > button {
+  overflow-wrap: anywhere;
+}
+.table-column-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.table-column-resize::after {
+  content: "";
+  position: absolute;
+  top: 25%;
+  bottom: 25%;
+  right: 7px;
+  width: 1px;
+  background: var(--border);
+}
+.table-column-resize:hover::after,
+.table-column-resize:focus-visible::after {
+  width: 2px;
+  background: var(--accent-blue);
+}
+.table-column-filters th {
+  padding: 6px !important;
+}
+.table-column-filters input {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 100%;
+  min-width: 70px;
+  padding: 5px 7px;
+  font-size: 11px;
+  font-weight: 400;
+  background: var(--app-bg);
+  color: var(--foreground);
+}
+.table-copy-enabled td {
+  position: relative;
+  padding-right: 32px;
+}
+.table-copy-cell {
+  position: absolute;
+  right: 3px;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+}
+.table-copy-cell:hover,
+.table-copy-cell:focus-visible {
+  background: var(--elevated-hover);
+  color: var(--foreground);
+}
+.interactive-table .table-row-tools {
+  padding: 5px !important;
+  width: 44px;
+  min-width: 44px;
+}
+.table-row-tools button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+}
+.table-statistics {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  font: 11px/1.7 var(--font-geist-sans);
+}
+.table-statistics p {
+  margin: 0 0 10px !important;
+  color: var(--muted-foreground);
+}
+.table-statistics > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+.table-statistics dl {
+  margin: 0;
+  min-width: 130px;
+}
+.table-statistics dt {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.table-statistics dd {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font: 11px/1.5 var(--font-geist-sans);
+}
+.table-pagination button {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.table-pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.table-status {
+  margin: 0 !important;
+  padding: 0 10px;
+  font: 11px/1.7 var(--font-geist-sans);
+  color: var(--muted-foreground);
+}
+.table-status:not(:empty) {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.table-expanded-placeholder {
+  font: 12px/1.7 var(--font-geist-sans);
+  padding: 14px;
+  margin: 0 !important;
+  color: var(--muted-foreground);
+}
+.app-dialog.wide.expanded-table-dialog {
+  width: min(1200px, calc(100vw - 24px));
+  max-height: 94dvh;
+}
+.expanded-table-dialog > .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--app-bg);
+  padding-bottom: 14px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+@media (max-width: 650px) {
+  .interactive-table .table-tools label {
+    flex-basis: 100%;
+  }
+  .table-tools > span {
+    margin-right: auto;
+    flex-basis: 100%;
+  }
+  .table-pagination {
+    font-size: 10px;
+    gap: 4px;
+    padding: 7px;
+  }
+}
+@media print {
+  .table-statistics,
+  .table-pagination,
+  .table-status,
+  .table-expanded-placeholder,
+  .table-column-resize {
+    display: none !important;
+  }
+  .interactive-table .table-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+  .interactive-table table {
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+  .interactive-table thead {
+    position: static;
+  }
+}
+@media screen {
+  .app-dialog.wide.expanded-table-dialog[open] {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px);
+    display: flex;
+    flex-direction: column;
+  }
+  .expanded-table-dialog > .dialog-heading,
+  .expanded-table-dialog > .table-tools,
+  .expanded-table-dialog > .table-pagination,
+  .expanded-table-dialog > .table-status {
+    flex-shrink: 0;
+  }
+  .expanded-table-dialog > .table-scroll {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
+  .expanded-table-dialog > .table-statistics {
+    flex-shrink: 0;
+    max-height: 25dvh;
+    overflow: auto;
+  }
+}
+@media print {
+  .interactive-table .table-tools {
+    display: none !important;
+  }
+  .table-copy-enabled td {
+    padding-right: 10px;
+  }
+}
+.table-heading-content {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.table-heading-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.table-heading-content > button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--muted-foreground);
+}
+.table-heading-content > button:hover,
+.table-heading-content > button:focus-visible {
+  color: var(--foreground);
+  background: var(--elevated-hover);
+  border-radius: 4px;
+}

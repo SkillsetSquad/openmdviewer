@@ -354,9 +354,13 @@ export default function Workspace() {
   }, [doc?.content, mode, loaded]);
   const navigateLink = useCallback(
     (href: string) => {
-      if (!doc) return;
+      const state = useReader.getState();
+      const from = state.documents.find(
+        (document) => document.id === state.activeId,
+      );
+      if (!from) return;
       try {
-        const result = resolveDocumentLink(doc, href, documents);
+        const result = resolveDocumentLink(from, href, state.documents);
         const target = result.target;
         if (!target && assetURLs[result.path]) {
           downloadLocalAsset(result.path, assetURLs[result.path]);
@@ -370,20 +374,20 @@ export default function Workspace() {
           );
           return;
         }
-        if (target.id !== activeId) openDocument(target.id);
+        if (target.id !== state.activeId) openDocument(target.id);
         if (result.actualAnchor)
           setTimeout(
             () =>
               document
                 .getElementById(result.actualAnchor)
                 ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-            target.id === activeId ? 0 : 100,
+            target.id === state.activeId ? 0 : 100,
           );
       } catch {
         notify("This document link is not valid.");
       }
     },
-    [doc, documents, activeId, openDocument, notify, assetURLs],
+    [openDocument, notify, assetURLs],
   );
   async function importFiles(files: File[]) {
     flushEdit();
@@ -968,6 +972,7 @@ export default function Workspace() {
           <div className="toolbar">
             <button
               className="document-search"
+              aria-label="Search in document"
               onClick={() => setFindOpen(!findOpen)}
             >
               <Search size={14} />
@@ -1192,6 +1197,7 @@ export default function Workspace() {
                       <>
                         <div className="configuration-left">
                           <Markdown
+                            key={doc.id}
                             content={doc.content.slice(
                               0,
                               doc.content.indexOf("![A still alpine lake"),
@@ -1203,6 +1209,7 @@ export default function Workspace() {
                         </div>
                         <div className="configuration-right">
                           <Markdown
+                            key={doc.id}
                             content={doc.content.slice(
                               doc.content.indexOf("![A still alpine lake"),
                             )}
@@ -1214,6 +1221,7 @@ export default function Workspace() {
                       </>
                     ) : (
                       <Markdown
+                        key={doc.id}
                         content={doc.content}
                         onLink={navigateLink}
                         assetURLs={assetURLs}
