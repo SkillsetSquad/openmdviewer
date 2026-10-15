@@ -48,6 +48,12 @@ export interface MarkdownModel {
   links: ModelLink[];
   rawLinks: ModelLink[];
   paragraphs: { text: string; line: number }[];
+  sourceBlocks: {
+    start: number;
+    end: number;
+    startOffset: number;
+    endOffset: number;
+  }[];
   statistics: {
     words: number;
     characters: number;
@@ -100,12 +106,25 @@ export function markdownModel(content: string): MarkdownModel {
   const anchorLocations: { id: string; line: number }[] = [];
   const links: ModelLink[] = [];
   const paragraphs: { text: string; line: number }[] = [];
+  const sourceBlocks: MarkdownModel["sourceBlocks"] = [];
   let codeBlocks = 0,
     tasks = 0,
     completed = 0,
     tables = 0;
   visit(parsed, (node) => {
     if (node.type === "code") codeBlocks++;
+    if (
+      ["code", "math", "inlineMath", "html"].includes(node.type) &&
+      node.position
+    )
+      sourceBlocks.push({
+        start: node.position.start.line + meta.lineOffset,
+        end: node.position.end.line + meta.lineOffset,
+        startOffset:
+          (node.position.start.offset || 0) + content.length - meta.body.length,
+        endOffset:
+          (node.position.end.offset || 0) + content.length - meta.body.length,
+      });
     if (node.type === "listItem" && typeof node.checked === "boolean") {
       tasks++;
       if (node.checked) completed++;
@@ -172,6 +191,7 @@ export function markdownModel(content: string): MarkdownModel {
       line: link.line + meta.lineOffset,
     })),
     paragraphs,
+    sourceBlocks,
     statistics: {
       words,
       characters: meta.body.length,

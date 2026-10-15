@@ -1,4 +1,10 @@
 "use client";
+import {
+  defaultSearchOptions,
+  type SearchOptions,
+  type SearchHit,
+} from "@/lib/search-results";
+import { renderedSearchRange, refreshSearchHit } from "@/lib/search-navigation";
 import { revealElement } from "@/lib/reveal-element";
 import type { CommandId } from "@/lib/commands";
 import type { HealthIssue } from "@/lib/health";
@@ -170,7 +176,17 @@ export default function Workspace() {
     resolvingConflict,
   } = session;
   const [dialog, setDialog] = useState<DialogName>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQueryValue] = useState("");
+  const [searchOptions, setSearchOptions] =
+    useState<SearchOptions>(defaultSearchOptions);
+  const [searchOffset, setSearchOffset] = useState(0);
+  const setQuery = useCallback((value: string) => {
+    setQueryValue(value);
+    setSearchOffset(0);
+  }, []);
+  const [pendingSearchHit, setPendingSearchHit] = useState<SearchHit | null>(
+    null,
+  );
   const [fileFilter, setFileFilter] = useState("");
   const [collection, setCollection] = useState<"all" | "favorites" | "recent">(
     "all",
@@ -353,6 +369,7 @@ export default function Workspace() {
   const openDocument = useCallback(
     (id: string) => {
       flushEdit();
+      setPendingSearchHit(null);
       setSourceLocation(null);
       if (activeId !== id) setHistory((h) => [...h, activeId].slice(-40));
       open(id);
@@ -373,6 +390,79 @@ export default function Workspace() {
     }));
     setDialog(null);
   };
+  const openSearchResult = async (id: string, hit?: SearchHit) => {
+    if (!(await flushEdit())) return;
+    const current = useReader
+      .getState()
+      .documents.find((item) => item.id === id);
+    if (!current) return;
+    const currentHit = hit ? refreshSearchHit(hit, current.content) : undefined;
+    if (hit && !currentHit) {
+      notify(
+        "This search result changed. Search again to locate the current text.",
+      );
+      return;
+    }
+    hit = currentHit || undefined;
+    openDocument(id);
+    setDialog(null);
+    if (hit?.location && (hit.location.sourceOnly || mode !== "read")) {
+      if (mode === "read") setMode("split");
+      setSourceLocation((value) => ({
+        line: hit.location!.line,
+        token: (value?.token || 0) + 1,
+      }));
+    } else if (!hit?.location && hit?.heading && mode !== "read") {
+      setSourceLocation((value) => ({
+        line: hit.heading!.line,
+        token: (value?.token || 0) + 1,
+      }));
+    } else if (hit?.location || hit?.heading) setPendingSearchHit(hit);
+  };
+  useEffect(() => {
+    if (
+      !pendingSearchHit ||
+      pendingSearchHit.id !== activeId ||
+      mode !== "read"
+    )
+      return;
+    const frame = requestAnimationFrame(() => {
+      const root = articleRef.current;
+      if (!root) return;
+      const range = renderedSearchRange(root, pendingSearchHit);
+      if (!range && !pendingSearchHit.location && pendingSearchHit.heading) {
+        const heading = document.getElementById(pendingSearchHit.heading.id);
+        if (heading && root.contains(heading)) {
+          revealElement(heading)?.scrollIntoView({
+            block: "center",
+            behavior: "smooth",
+          });
+          root.focus({ preventScroll: true });
+        }
+      }
+      if (range) {
+        revealElement(range.startContainer.parentElement)?.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        });
+        root.focus({ preventScroll: true });
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      } else if (pendingSearchHit.location) {
+        setMode("split");
+        setSourceLocation((value) => ({
+          line: pendingSearchHit.location!.line,
+          token: (value?.token || 0) + 1,
+        }));
+        notify(
+          `Opened matching source line ${pendingSearchHit.location.line}.`,
+        );
+      }
+      setPendingSearchHit(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingSearchHit, activeId, mode, setMode, notify]);
   const update = useCallback(
     (patch: Partial<ReaderDocument>, debounce = false) => {
       if (!doc) return;
@@ -393,6 +483,7 @@ export default function Workspace() {
   );
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return;
       const modalOpen = !!document.querySelector("dialog[open]");
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -431,9 +522,23 @@ export default function Workspace() {
         setPresentation(false);
       }
     };
+    const paletteKeys = (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) return;
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k")
+        return;
+      const modal = document.querySelector("dialog[open]");
+      if (modal && !modal.classList.contains("command-palette-dialog")) return;
+      // Reserve the application shortcut before CodeMirror's Ctrl+K edit binding runs.
+      event.stopPropagation();
+      keys(event);
+    };
+    window.addEventListener("keydown", paletteKeys, true);
     window.addEventListener("keydown", keys);
-    return () => window.removeEventListener("keydown", keys);
-  }, [doc, flushEdit]);
+    return () => {
+      window.removeEventListener("keydown", paletteKeys, true);
+      window.removeEventListener("keydown", keys);
+    };
+  }, [doc, flushEdit, setQuery]);
   useEffect(() => {
     if (!loaded || !viewportRef.current) return;
     viewportRef.current.scrollTop =
@@ -710,10 +815,11 @@ export default function Workspace() {
   const documentQuery = commandsOnly ? "" : query;
   const {
     ids: searchIds,
+    page: searchPage,
     failed: searchFailed,
     navigation,
     indexing,
-  } = useLocalSearch(documents, documentQuery);
+  } = useLocalSearch(documents, documentQuery, searchOptions, searchOffset);
   const searching =
     !!documentQuery.trim() && searchIds === null && !searchFailed;
   const results = useMemo(
@@ -1861,6 +1967,13 @@ export default function Workspace() {
           <CommandPalette
             query={query}
             onQuery={setQuery}
+            options={searchOptions}
+            onOptions={(value) => {
+              setSearchOptions(value);
+              setSearchOffset(0);
+            }}
+            page={searchPage}
+            onPage={setSearchOffset}
             documents={results}
             summaries={documentSummaries}
             hasDocument={!!doc}
@@ -1868,10 +1981,7 @@ export default function Workspace() {
             failed={searchFailed}
             onClose={() => setDialog(null)}
             onCommand={(id) => void runCommand(id)}
-            onOpen={(id) => {
-              openDocument(id);
-              setDialog(null);
-            }}
+            onOpen={(id, hit) => void openSearchResult(id, hit)}
           />
         </Suspense>
       )}

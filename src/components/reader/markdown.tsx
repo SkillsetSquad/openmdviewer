@@ -12,6 +12,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import rehypeKatex from "rehype-katex";
+import { rehypeSourceLocations } from "@/lib/source-locations";
 import { rehypeMathTools, rehypeMathErrors } from "@/lib/math-tools";
 import { MathExpression } from "./math-expression";
 import {
@@ -168,6 +169,7 @@ export const Markdown = memo(function Markdown({
               { strict: "warn", trust: false, maxExpand: 1000, maxSize: 20 },
             ],
             rehypeMathErrors,
+            [rehypeSourceLocations, { offset: parsed.lineOffset }],
           ]}
           components={components}
           urlTransform={(url) =>

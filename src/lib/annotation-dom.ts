@@ -1,7 +1,7 @@
 import { matchQuote, quoteAt } from "./annotations";
 import type { TextQuote } from "./types";
 const excluded =
-  "button,input,select,textarea,svg,.code-block,pre,.katex,.media-player,.interactive-table,.diagram,[aria-hidden=true]";
+  "button,input,select,textarea,svg,.code-block,pre,.katex,.reader-math,.media-player,.interactive-table,.diagram,[aria-hidden=true]";
 export function readingText(root: HTMLElement) {
   const entries: { node: Text; start: number; end: number }[] = [];
   let text = "";

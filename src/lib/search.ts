@@ -1,4 +1,14 @@
 import MiniSearch from "minisearch";
+import {
+  defaultSearchOptions,
+  literalMatches,
+  parseSearchQuery,
+  searchExcerpt,
+  unicodePrefix,
+  type SearchOptions,
+  type SearchPage,
+  type SearchHit,
+} from "./search-results";
 import { markdownModel, type MarkdownModel } from "./markdown-model";
 import { workspaceNavigation } from "./references";
 import { metadataString, metadataTags } from "./frontmatter";
@@ -60,44 +70,206 @@ export class LocalSearch {
     return workspaceNavigation([...this.documents.values()], this.models);
   }
   search(query: string): string[] {
-    const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-    const filters = tokens.filter((t) =>
-      /^(tag|path|heading|status|type):/i.test(t),
+    return this.find(query).hits.map((hit) => hit.id);
+  }
+  find(
+    query: string,
+    options: SearchOptions = defaultSearchOptions,
+    offset = 0,
+  ): SearchPage {
+    if (query.length > 512)
+      return {
+        hits: [],
+        total: 0,
+        offset: 0,
+        error:
+          "Search supports up to 512 characters. Shorten this query to search.",
+      };
+    const { filters, phrases, words, terms } = parseSearchQuery(query);
+    const literal =
+      options.literal || options.caseSensitive || options.wholeWord;
+    const indexed =
+      !literal && words.length
+        ? this.index.search(words.join(" "), { combineWith: "AND" })
+        : null;
+    const matchedTerms = new Map(
+      indexed?.map((result) => [
+        String(result.id),
+        Object.keys(result.match),
+      ]) || [],
     );
-    const phrases = tokens
-      .filter((t) => t.startsWith('"'))
-      .map((t) => t.replace(/^"|"$/g, "").toLowerCase());
-    const words = tokens
-      .filter((t) => !filters.includes(t) && !t.startsWith('"'))
-      .join(" ");
-    const candidates = words
-      ? this.index
-          .search(words, { combineWith: "AND" })
-          .map((r) => r.id as string)
+    const candidates = indexed
+      ? indexed.map((result) => String(result.id))
       : [...this.documents.keys()];
-    return candidates
-      .filter((id) => {
-        const d = this.documents.get(id)!;
-        const text = `${d.path}\n${d.content}\n${d.metadata}`.toLowerCase();
-        if (!phrases.every((p) => text.includes(p))) return false;
-        return filters.every((t) => {
-          const [key, ...parts] = t.split(":");
-          const v = parts.join(":").replace(/^"|"$/g, "").toLowerCase();
-          if (key.toLowerCase() === "tag")
-            return d.tags.some((tag) => tag.toLowerCase().includes(v));
-          if (key.toLowerCase() === "path")
-            return d.path.toLowerCase().includes(v);
-          if (key.toLowerCase() === "heading")
-            return d.headings.toLowerCase().includes(v);
-          if (key.toLowerCase() === "status")
-            return d.status.toLowerCase() === v;
-          if (key.toLowerCase() === "type")
-            return v === "markdown"
+    const matches = candidates.filter((id) => {
+      const d = this.documents.get(id)!;
+      const text = `${d.title}\n${d.path}\n${d.content}\n${d.headings}\n${d.tags.join(" ")}\n${d.metadata}`;
+      if (
+        !phrases.every(
+          (phrase) => literalMatches(text, phrase, options, 1).length,
+        )
+      )
+        return false;
+      if (
+        literal &&
+        !words.every((term) => literalMatches(text, term, options, 1).length)
+      )
+        return false;
+      return filters.every((token) => {
+        const [key, ...parts] = token.split(":");
+        const value = parts.join(":").replace(/^"|"$/g, "").toLowerCase();
+        switch (key.toLowerCase()) {
+          case "tag":
+            return d.tags.some((tag) => tag.toLowerCase().includes(value));
+          case "path":
+            return d.path.toLowerCase().includes(value);
+          case "heading":
+            return d.headings.toLowerCase().includes(value);
+          case "status":
+            return d.status.toLowerCase() === value;
+          case "type":
+            return value === "markdown"
               ? /\.(md|markdown|mdown|mkd|mdx)$/i.test(d.path)
-              : d.path.toLowerCase().endsWith("." + (v === "text" ? "txt" : v));
-          return true;
-        });
-      })
-      .slice(0, 50);
+              : d.path
+                  .toLowerCase()
+                  .endsWith("." + (value === "text" ? "txt" : value));
+          default:
+            return true;
+        }
+      });
+    });
+    const start = Math.min(
+      Math.max(0, Math.floor((Number.isFinite(offset) ? offset : 0) / 50) * 50),
+      Math.max(0, Math.floor((matches.length - 1) / 50) * 50),
+    );
+    const hits: SearchHit[] = matches.slice(start, start + 50).map((id) => {
+      const d = this.documents.get(id)!,
+        model = this.models.get(id)!;
+      const actualTerms = (matchedTerms.get(id) || [])
+        .slice(0, 32)
+        .map((term) => unicodePrefix(term, 512));
+      const needles = [...new Set([...terms, ...actualTerms])];
+      let position = -1,
+        needle = "";
+      for (const term of needles) {
+        const match = literalMatches(d.content, term, options, 1)[0];
+        if (match && (position < 0 || match.start < position)) {
+          position = match.start;
+          needle = d.content.slice(match.start, match.end);
+          break;
+        }
+      }
+      const line =
+        position >= 0
+          ? d.content.slice(0, position).split(/\r\n?|\n/).length
+          : undefined;
+      const headingFilter = filters
+        .find((token) => /^heading:/i.test(token))
+        ?.slice(8)
+        .replace(/^"|"$/g, "");
+      const heading = line
+        ? model.headings.filter((h) => h.line <= line).at(-1)
+        : model.headings.find(
+            (h) =>
+              needles.some(
+                (term) => literalMatches(h.text, term, options, 1).length,
+              ) ||
+              (headingFilter &&
+                h.text.toLowerCase().includes(headingFilter.toLowerCase())),
+          );
+      const bodyStart = d.content.length - model.frontmatter.body.length;
+      const tagFilters = filters
+        .filter((token) => /^tag:/i.test(token))
+        .map((token) => token.slice(4).replace(/^"|"$/g, "").toLowerCase());
+      const relevantTags = d.tags.filter(
+        (tag) =>
+          tagFilters.some((value) => tag.toLowerCase().includes(value)) ||
+          needles.some((term) => literalMatches(tag, term, options, 1).length),
+      );
+      const relevantSet = new Set(relevantTags);
+      const headingOptions = {
+        ...options,
+        caseSensitive: headingFilter ? false : options.caseSensitive,
+        wholeWord: headingFilter ? false : options.wholeWord,
+      };
+      const headingNeedles = needles.length
+        ? needles
+        : headingFilter
+          ? [headingFilter]
+          : [];
+      const headingMatch =
+        position < 0 && heading
+          ? headingNeedles
+              .flatMap((term) =>
+                literalMatches(heading.text, term, headingOptions, 1),
+              )
+              .sort((a, b) => a.start - b.start)[0]
+          : undefined;
+      return {
+        id,
+        title: d.title,
+        path: d.path,
+        tags: [
+          ...relevantTags,
+          ...d.tags.filter((tag) => !relevantSet.has(tag)),
+        ].slice(0, 10),
+        status: d.status,
+        ...(position < 0 && heading
+          ? searchExcerpt(
+              heading.text,
+              headingMatch?.start ?? -1,
+              headingMatch ? headingMatch.end - headingMatch.start : 0,
+              0,
+              headingNeedles,
+              headingOptions,
+            )
+          : searchExcerpt(
+              d.content,
+              position,
+              needle.length,
+              bodyStart,
+              needles,
+              options,
+            )),
+        terms: [
+          ...new Set([
+            ...needles,
+            ...filters.map((token) =>
+              token.slice(token.indexOf(":") + 1).replace(/^"|"$/g, ""),
+            ),
+          ]),
+        ].slice(0, 64),
+        fuzzy:
+          !literal &&
+          !!words.length &&
+          !words.every(
+            (term) =>
+              literalMatches(
+                `${d.title}\n${d.path}\n${d.content}\n${d.metadata}`,
+                term,
+                options,
+                1,
+              ).length,
+          ),
+        heading,
+        ...(line
+          ? {
+              location: {
+                line,
+                offset: position,
+                needle,
+                sourceOnly:
+                  position < bodyStart ||
+                  model.sourceBlocks.some(
+                    (block) =>
+                      position < block.endOffset &&
+                      position + needle.length > block.startOffset,
+                  ),
+              },
+            }
+          : {}),
+      };
+    });
+    return { hits, total: matches.length, offset: start };
   }
 }

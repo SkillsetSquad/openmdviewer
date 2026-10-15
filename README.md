@@ -2,7 +2,7 @@
 
 **Your words. Your space.** A free, open-source Markdown reader and local knowledge workspace by SkillsetSquad. A compact, three-pane interface with a file tree, a focused reading surface, and contextual document navigation.
 
-[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Callouts](docs/CALLOUTS.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Tables](docs/TABLES.md) · [Images](docs/IMAGES.md) · [Audio/video](docs/MEDIA.md) · [Notes/bookmarks](docs/ANNOTATIONS.md) · [Code tools](docs/CODE.md) · [Equations](docs/MATH.md) · [Diagrams](docs/DIAGRAMS.md) · [Contributor instructions](AGENTS.md)
+[Live reader](https://skillsetsquad.github.io/openmdviewer/) · [Deployment guide](docs/DEPLOYMENT.md) · [Product roadmap](docs/PRODUCT_BRIEF.md) · [Markdown support](docs/MARKDOWN.md) · [Callouts](docs/CALLOUTS.md) · [Health checks](docs/HEALTH.md) · [Workspace graph](docs/GRAPH.md) · [Keyboard commands](docs/COMMANDS.md) · [Local search](docs/SEARCH.md) · [Tables](docs/TABLES.md) · [Images](docs/IMAGES.md) · [Audio/video](docs/MEDIA.md) · [Notes/bookmarks](docs/ANNOTATIONS.md) · [Code tools](docs/CODE.md) · [Equations](docs/MATH.md) · [Diagrams](docs/DIAGRAMS.md) · [Contributor instructions](AGENTS.md)
 
 ## Run locally
 
@@ -31,7 +31,7 @@ The `out/` directory is the entire application. No application server, accounts,
 - Full-viewport image gallery with zoom/pan, keyboard navigation, local dimensions/type/byte size, original downloads, PNG clipboard copying, and individual remote-image consent.
 - Local Markdown/text/MDX and media imports, folder selection, ZIP imports with size limits, duplicate-path protection, drag and drop, document creation and path renaming.
 - Named, isolated local workspaces with icons and descriptions; IndexedDB document persistence; local reading preferences; scroll restoration; favorites; tags; source/split editing with CodeMirror and debounced browser autosave, the previous 50 content revisions, restore/compare, recoverable trash, duplication, and stale-tab conflict detection.
-- Incremental worker-based fuzzy search with phrases and `tag:`, `path:`, `heading:`, `status:`, and `type:` filters, in-document find, a fuzzy command palette with keyboard navigation and commands-only search, focus and presentation reading, six theme choices, font and layout settings.
+- Incremental worker-based fuzzy/literal search with phrases, case/whole-word controls, highlighted excerpts, section/source-line navigation, exact result counts, pagination, and `tag:`, `path:`, `heading:`, `status:`, and `type:` filters, in-document find, a fuzzy command palette with keyboard navigation and commands-only search, focus and presentation reading, six theme choices, font and layout settings.
 - Markdown, sanitized standalone HTML with passive media references, ZIP workspace export with media, folders, tags, favorites, and document dates; browser print / Save as PDF; worker-based document/workspace health reports with transparent rule scores, declared review-date checks, broken-link and image diagnostics, duplicate-body detection, JSON export, and source-line navigation.
 - Static PWA with all application modules precached for offline use, bundled fonts/images, CSP, no telemetry or document uploads.
 

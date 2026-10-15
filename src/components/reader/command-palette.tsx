@@ -29,6 +29,12 @@ import { Modal } from "./modal";
 import { commandMatches, type CommandId } from "@/lib/commands";
 import type { DocumentSummary } from "@/lib/references";
 import type { ReaderDocument } from "@/lib/types";
+import { SearchHighlight } from "./search-highlight";
+import type {
+  SearchPage,
+  SearchOptions,
+  SearchHit,
+} from "@/lib/search-results";
 import { fileName } from "@/lib/paths";
 
 const icons = {
@@ -57,19 +63,6 @@ const icons = {
   exportPdf: Printer,
   presentation: Maximize2,
 };
-function excerpt(content: string, query: string) {
-  const searchable = content.slice(0, 50000);
-  const term =
-    query.match(/"([^"]+)"/)?.[1] ||
-    query.split(/\s+/).find((term) => term && !term.includes(":")) ||
-    "";
-  const position = term
-    ? searchable.toLowerCase().indexOf(term.toLowerCase())
-    : -1;
-  const start = Math.max(0, position - 40);
-  return searchable.slice(start, start + 150).replace(/[#*`]/g, "");
-}
-
 export default function CommandPalette({
   query,
   onQuery,
@@ -81,6 +74,10 @@ export default function CommandPalette({
   onCommand,
   onOpen,
   onClose,
+  page,
+  options,
+  onOptions,
+  onPage,
 }: {
   query: string;
   onQuery: (query: string) => void;
@@ -90,9 +87,14 @@ export default function CommandPalette({
   searching: boolean;
   failed: boolean;
   onCommand: (id: CommandId) => void;
-  onOpen: (id: string) => void;
+  onOpen: (id: string, hit?: SearchHit) => void;
+  page: SearchPage | null;
+  options: SearchOptions;
+  onOptions: (options: SearchOptions) => void;
+  onPage: (offset: number) => void;
   onClose: () => void;
 }) {
+  const hitMap = new Map(page?.hits.map((hit) => [hit.id, hit]) || []);
   const listId = useId();
   const hintId = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -122,7 +124,7 @@ export default function CommandPalette({
   const activate = (key: string | undefined) => {
     if (!key) return;
     if (key.startsWith("command:")) onCommand(key.slice(8) as CommandId);
-    else onOpen(key.slice(9));
+    else onOpen(key.slice(9), hitMap.get(key.slice(9)));
   };
   return (
     <Modal
@@ -143,6 +145,7 @@ export default function CommandPalette({
           aria-controls={listId}
           aria-activedescendant={activeId}
           aria-describedby={hintId}
+          maxLength={512}
           autoComplete="off"
           spellCheck={false}
           placeholder="Search documents or commands · > for actions"
@@ -175,6 +178,55 @@ export default function CommandPalette({
         />
         <kbd>esc</kbd>
       </div>
+      {!only && (
+        <div className="search-options">
+          <label>
+            Matching{" "}
+            <select
+              aria-label="Document matching"
+              value={options.literal ? "literal" : "fuzzy"}
+              onChange={(event) =>
+                onOptions(
+                  event.target.value === "fuzzy"
+                    ? { literal: false, caseSensitive: false, wholeWord: false }
+                    : { ...options, literal: true },
+                )
+              }
+            >
+              <option value="fuzzy">Fuzzy</option>
+              <option value="literal">Literal</option>
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={options.caseSensitive}
+              onChange={(event) =>
+                onOptions({
+                  ...options,
+                  literal: true,
+                  caseSensitive: event.target.checked,
+                })
+              }
+            />{" "}
+            Match case
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={options.wholeWord}
+              onChange={(event) =>
+                onOptions({
+                  ...options,
+                  literal: true,
+                  wholeWord: event.target.checked,
+                })
+              }
+            />{" "}
+            Whole words
+          </label>
+        </div>
+      )}
       <div
         className="palette-results"
         id={listId}
@@ -216,11 +268,13 @@ export default function CommandPalette({
           <div role="group" aria-label="Documents">
             <div className="result-label" aria-hidden="true">
               {query.trim()
-                ? `${visibleDocuments.length}${visibleDocuments.length === 50 ? "+" : ""} MATCHING DOCUMENTS`
+                ? `${page?.total ?? visibleDocuments.length} MATCHING DOCUMENT${(page?.total ?? visibleDocuments.length) === 1 ? "" : "S"}`
                 : "DOCUMENTS"}
             </div>
             {visibleDocuments.map((doc, index) => {
               const key = `document:${doc.id}`;
+              const hit = hitMap.get(doc.id);
+              const terms = hit?.terms || [];
               return (
                 <button
                   role="option"
@@ -236,10 +290,55 @@ export default function CommandPalette({
                   <FileText size={18} aria-hidden="true" />
                   <span>
                     <strong>
-                      {summaries[doc.id]?.title || fileName(doc.path)}
+                      <SearchHighlight
+                        text={
+                          hit?.title ||
+                          summaries[doc.id]?.title ||
+                          fileName(doc.path)
+                        }
+                        terms={terms}
+                        options={options}
+                      />
                     </strong>
-                    <small>{doc.path}</small>
-                    {query.trim() && <p>{excerpt(doc.content, query)}</p>}
+                    <small>
+                      <SearchHighlight
+                        text={doc.path}
+                        terms={terms}
+                        options={options}
+                      />
+                    </small>
+                    {hit?.heading && (
+                      <small className="search-section">
+                        Section:{" "}
+                        <SearchHighlight
+                          text={hit.heading.text}
+                          terms={terms}
+                          options={options}
+                        />
+                      </small>
+                    )}
+                    {query.trim() && hit && (
+                      <span className="search-excerpt">
+                        <SearchHighlight
+                          text={hit.excerpt}
+                          terms={[]}
+                          options={options}
+                          ranges={hit.excerptRanges}
+                        />
+                      </span>
+                    )}
+                    {query.trim() && hit && (
+                      <span className="search-result-meta">
+                        {hit.location
+                          ? `Line ${hit.location.line}${hit.location.sourceOnly ? " · Source" : ""}`
+                          : hit.heading
+                            ? "Section match"
+                            : "Title, path, or metadata"}
+                        {hit.fuzzy && " · Fuzzy match"}
+                        {hit.status && ` · ${hit.status}`}
+                        {hit.tags.length > 0 && ` · ${hit.tags.join(", ")}`}
+                      </span>
+                    )}
                   </span>
                   <ChevronRight size={14} aria-hidden="true" />
                 </button>
@@ -248,6 +347,28 @@ export default function CommandPalette({
           </div>
         )}
       </div>
+      {!only && page && page.total > 50 && (
+        <nav className="search-pagination" aria-label="Search result pages">
+          <button
+            type="button"
+            disabled={searching || page.offset === 0}
+            onClick={() => onPage(page.offset - 50)}
+          >
+            Previous results
+          </button>
+          <span>
+            {page.offset + 1}–{Math.min(page.offset + 50, page.total)} of{" "}
+            {page.total} documents
+          </span>
+          <button
+            type="button"
+            disabled={searching || page.offset + 50 >= page.total}
+            onClick={() => onPage(page.offset + 50)}
+          >
+            Next results
+          </button>
+        </nav>
+      )}
       <div className="palette-feedback" role="status" aria-live="polite">
         {searching && !only && (
           <p className="empty-panel">Searching documents on this device…</p>
@@ -258,13 +379,17 @@ export default function CommandPalette({
             to rebuild the document index.
           </p>
         )}
-        {query.trim() && !keys.length && (!searching || only) && (
-          <p className="empty-panel">
-            {only
-              ? "No matching commands. Try settings, graph, or export."
-              : "No matches. Try a different phrase, path:docs, tag:guide, or > for commands."}
-          </p>
-        )}
+        {page?.error && !only && <p className="empty-panel">{page.error}</p>}
+        {query.trim() &&
+          !keys.length &&
+          !page?.error &&
+          (!searching || only) && (
+            <p className="empty-panel">
+              {only
+                ? "No matching commands. Try settings, graph, or export."
+                : "No matches. Try a different phrase, path:docs, tag:guide, or > for commands."}
+            </p>
+          )}
       </div>
       <p className="palette-hint" id={hintId}>
         ↑ / ↓ to navigate · Enter to choose · Escape to close · Type &gt; to

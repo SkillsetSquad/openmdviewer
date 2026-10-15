@@ -1,4 +1,5 @@
 import { LocalSearch, type SearchDocument } from "../lib/search";
+import type { SearchOptions } from "../lib/search-results";
 const search = new LocalSearch();
 self.onmessage = (
   event: MessageEvent<{
@@ -6,6 +7,8 @@ self.onmessage = (
     changes?: SearchDocument[];
     removed?: string[];
     query?: string;
+    options?: SearchOptions;
+    offset?: number;
     request?: number;
     indexVersion?: number;
   }>,
@@ -25,7 +28,11 @@ self.onmessage = (
     } else
       self.postMessage({
         request: event.data.request,
-        ids: search.search(event.data.query || ""),
+        page: search.find(
+          event.data.query || "",
+          event.data.options,
+          event.data.offset,
+        ),
       });
   } catch {
     self.postMessage({ request: event.data.request, error: true });

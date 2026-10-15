@@ -1,9 +1,20 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import {
+  defaultSearchOptions,
+  type SearchOptions,
+  type SearchPage,
+} from "@/lib/search-results";
 import { basePath } from "@/lib/types";
 import type { WorkspaceNavigation } from "@/lib/references";
 import type { ReaderDocument } from "@/lib/types";
-export function useLocalSearch(documents: ReaderDocument[], query: string) {
+export function useLocalSearch(
+  documents: ReaderDocument[],
+  query: string,
+  options: SearchOptions = defaultSearchOptions,
+  offset = 0,
+) {
+  const queryKey = JSON.stringify([query, options, offset]);
   const worker = useRef<Worker | null>(null);
   const versions = useRef(
     new Map<string, { path: string; content: string; tags: string }>(),
@@ -15,11 +26,12 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
     summaries: [],
   });
   const [indexing, setIndexing] = useState(false);
-  const [result, setResult] = useState<{ query: string; ids: string[] } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    key: string;
+    page: SearchPage;
+  } | null>(null);
   const [failed, setFailed] = useState(false);
-  const currentQuery = useRef(query);
+  const currentQuery = useRef<string | null>(null);
   useEffect(() => {
     const instance = new Worker(`${basePath}/search-worker.js`);
     worker.current = instance;
@@ -41,8 +53,17 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
         }
         return;
       }
-      if (event.data.request === sequence.current)
-        setResult({ query: currentQuery.current, ids: event.data.ids });
+      if (event.data.request === sequence.current) {
+        if (
+          !event.data.page ||
+          !Array.isArray(event.data.page.hits) ||
+          typeof event.data.page.total !== "number"
+        ) {
+          setFailed(true);
+          return;
+        }
+        setResult({ key: currentQuery.current || "", page: event.data.page });
+      }
     };
     return () => {
       instance.terminate();
@@ -74,22 +95,30 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
         return { id: d.id, path: d.path, content: d.content, tags: d.tags };
       });
     removed.forEach((id) => versions.current.delete(id));
-    if (changes.length || removed.length)
+    if (!changes.length && !removed.length && currentQuery.current === queryKey)
+      return;
+    if (changes.length || removed.length) {
+      setResult(null);
       worker.current?.postMessage({
         type: "sync",
         changes,
         removed,
         indexVersion: ++indexVersion.current,
       });
-    currentQuery.current = query;
+    }
+    currentQuery.current = queryKey;
     worker.current?.postMessage({
       type: "search",
       query,
+      options,
+      offset,
       request: ++sequence.current,
     });
-  }, [documents, query]);
+  }, [documents, query, options, offset, queryKey]);
   return {
-    ids: result?.query === query ? result.ids : null,
+    ids:
+      result?.key === queryKey ? result.page.hits.map((hit) => hit.id) : null,
+    page: result?.key === queryKey ? result.page : null,
     failed,
     navigation,
     indexing,
