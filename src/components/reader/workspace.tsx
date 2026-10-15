@@ -34,6 +34,7 @@ import {
   Maximize2,
   Menu,
   Moon,
+  Network,
   PanelLeftClose,
   PanelRightClose,
   Pencil,
@@ -77,6 +78,7 @@ import {
   supportedFile,
 } from "@/lib/documents";
 import type { ReaderDocument, ReaderTheme } from "@/lib/types";
+const WorkspaceGraph = lazy(() => import("./workspace-graph"));
 const Insights = lazy(() => import("./insights"));
 const DocumentProperties = lazy(() => import("./document-properties"));
 const Editor = lazy(() => import("./editor"));
@@ -89,6 +91,7 @@ type DialogName =
   | "tags"
   | "analyze"
   | "health"
+  | "graph"
   | "properties"
   | "help"
   | "workspaces"
@@ -203,11 +206,25 @@ export default function Workspace() {
   }, [preferences, activeId, workspaceId, loaded, switching]);
   useEffect(() => {
     if (!loaded) return;
+    const narrow = window.matchMedia("(max-width: 999px)");
+    const mobile = window.matchMedia("(max-width: 749px)");
+    const closeDetails = () => {
+      if (narrow.matches) setRightOpen(false);
+    };
+    const closeFiles = () => {
+      if (mobile.matches) setLeftOpen(false);
+    };
     const frame = window.requestAnimationFrame(() => {
-      if (window.innerWidth < 1000) setRightOpen(false);
-      if (window.innerWidth < 750) setLeftOpen(false);
+      closeDetails();
+      closeFiles();
     });
-    return () => window.cancelAnimationFrame(frame);
+    narrow.addEventListener("change", closeDetails);
+    mobile.addEventListener("change", closeFiles);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      narrow.removeEventListener("change", closeDetails);
+      mobile.removeEventListener("change", closeFiles);
+    };
   }, [loaded]);
   useEffect(() => {
     if (!toast) return;
@@ -656,6 +673,12 @@ export default function Workspace() {
                 WORKSPACE <ShieldCheck size={11} />
               </button>
               <div>
+                <IconButton
+                  label="Workspace graph"
+                  onClick={() => setDialog("graph")}
+                >
+                  <Network size={15} />
+                </IconButton>
                 <IconButton
                   label="Open folder"
                   onClick={() => folderRef.current?.click()}
@@ -1293,6 +1316,10 @@ export default function Workspace() {
                     {backlinks.length} incoming{" "}
                     {backlinks.length === 1 ? "connection" : "connections"}
                   </p>
+                  <Button variant="outline" onClick={() => setDialog("graph")}>
+                    <Network size={14} />
+                    Explore workspace graph
+                  </Button>
                 </div>
               )}
               <section className="details-section">
@@ -1607,6 +1634,11 @@ export default function Workspace() {
                   },
                   { label: "Create document", icon: FilePlus2, action: "new" },
                   {
+                    label: "Show workspace graph",
+                    icon: Network,
+                    action: "graph",
+                  },
+                  {
                     label: "Reading settings",
                     icon: Settings2,
                     action: "settings",
@@ -1634,6 +1666,7 @@ export default function Workspace() {
                         setDialog("new");
                       }
                       if (action === "settings") setDialog("settings");
+                      if (action === "graph") setDialog("graph");
                       if (action === "focus") setFocus(!focus);
                       if (action === "export") void exportZip();
                     }}
@@ -2006,6 +2039,28 @@ export default function Workspace() {
             documentId={dialog === "analyze" ? activeId : undefined}
             onOpenIssue={openFinding}
             onClose={() => setDialog(null)}
+          />
+        </Suspense>
+      )}
+      {dialog === "graph" && (
+        <Suspense
+          fallback={
+            <Modal title="Workspace graph" onClose={() => setDialog(null)}>
+              <p role="status">Loading local graph…</p>
+            </Modal>
+          }
+        >
+          <WorkspaceGraph
+            key={workspaceId}
+            navigation={navigation}
+            activeId={activeId}
+            indexing={indexing}
+            failed={searchFailed}
+            onClose={() => setDialog(null)}
+            onOpen={(id) => {
+              openDocument(id);
+              setDialog(null);
+            }}
           />
         </Suspense>
       )}

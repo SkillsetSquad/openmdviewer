@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "public/search-worker.js",
     "public/analysis-worker.js",
+    "public/graph-worker.js",
   ]),
 ]);
 

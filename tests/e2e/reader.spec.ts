@@ -179,6 +179,15 @@ test("starts offline and opens lazy rendering modules from the application cache
   });
   await page.getByRole("button", { name: "Split view", exact: true }).click();
   await expect(page.locator(".cm-content")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Workspace graph", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Workspace graph" }).locator("canvas"),
+  ).toBeVisible();
+  await expect(page.locator(".workspace-graph-summary")).toContainText(
+    "15 of 15 documents",
+  );
 });
 
 test("sorts and filters tables without changing Markdown and exports safe CSV", async ({
@@ -963,8 +972,10 @@ test("retains multiple queued conflicts until both documents have been recovered
   await page.waitForFunction(
     () => (window as Window & { __saveLock?: boolean }).__saveLock === true,
   );
+  await expect(second.locator(".cm-content")).toHaveText("# Original A");
   await second.locator(".cm-content").fill("# Second A");
   await second.getByRole("button", { name: "Queue B.md", exact: true }).click();
+  await expect(second.locator(".cm-content")).toHaveText("# Original B");
   await second.locator(".cm-content").fill("# Second B");
   await page.waitForFunction(
     () =>
@@ -1000,4 +1011,330 @@ test("retains multiple queued conflicts until both documents have been recovered
     second.getByRole("heading", { name: "First A", exact: true }),
   ).toBeVisible();
   await second.close();
+});
+
+test("explores the whole workspace graph with filters, directed links, canvas controls, and keyboard navigation", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles([
+      {
+        name: "ConstellationA.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from(
+          "---\ntags: [api]\n---\n# Atlas Hub\n[B](ConstellationB.md) and [B again](ConstellationB.md)",
+        ),
+      },
+      {
+        name: "ConstellationB.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from(
+          "---\ntags: [api]\n---\n# Beacon\n[C](ConstellationC.md)",
+        ),
+      },
+      {
+        name: "ConstellationC.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Comet\n[D](ConstellationD.md)"),
+      },
+      {
+        name: "ConstellationD.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Drift"),
+      },
+      {
+        name: "ConstellationE.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from(
+          "# Empty Island\n[Self](#empty-island) [Missing](missing.md)",
+        ),
+      },
+    ]);
+  await page
+    .getByRole("button", { name: "Workspace graph", exact: true })
+    .click();
+  const modal = page.getByRole("dialog", {
+    name: "Workspace graph",
+    exact: true,
+  });
+  const list = modal.getByRole("region", { name: "Graph document list" });
+  const details = modal.getByRole("region", {
+    name: "Selected graph document",
+  });
+  await expect(
+    modal.getByRole("img", { name: /Workspace document graph/ }),
+  ).toBeVisible();
+  await modal
+    .getByRole("textbox", { name: "Search graph documents" })
+    .fill("Constellation");
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(5);
+  await expect(modal.locator(".workspace-graph-summary")).toContainText(
+    "3 directed connections shown",
+  );
+  await list.getByRole("button", { name: /Atlas Hub/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(details).toContainText("2 links");
+  await details
+    .getByRole("button", { name: "Explore connections", exact: true })
+    .click();
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(2);
+  await modal
+    .getByRole("combobox", { name: "Connection distance" })
+    .selectOption("2");
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(3);
+  await modal
+    .getByRole("combobox", { name: "Connection distance" })
+    .selectOption("all");
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(4);
+  const canvas = modal.locator("canvas");
+  const zoom = modal.getByRole("status", { name: "Graph zoom" });
+  await modal
+    .getByRole("button", { name: "Center selected", exact: true })
+    .click();
+  await list.getByRole("button", { name: /Beacon/ }).click();
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error("Graph canvas is not visible");
+  await canvas.click({
+    position: { x: bounds.width / 2, y: bounds.height / 2 },
+  });
+  await expect(details.locator(":scope > strong")).toHaveText("Atlas Hub");
+  const beforeWheel = await zoom.textContent();
+  await page.mouse.move(
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height / 2,
+  );
+  await page.mouse.wheel(0, -100);
+  await expect(zoom).not.toHaveText(beforeWheel!);
+  const before = await zoom.textContent();
+  await modal
+    .getByRole("button", { name: "Zoom graph in", exact: true })
+    .click();
+  await expect(zoom).not.toHaveText(before!);
+  await canvas.focus();
+  await page.keyboard.press("+");
+  await page.keyboard.press("ArrowLeft");
+  await modal.getByRole("button", { name: "Fit graph", exact: true }).click();
+  await modal
+    .getByRole("button", { name: "Show whole workspace", exact: true })
+    .click();
+  await modal
+    .getByRole("textbox", { name: "Search graph documents" })
+    .fill("Constellation");
+  await modal
+    .getByRole("combobox", { name: "Filter graph connections" })
+    .selectOption("isolated");
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(1);
+  await expect(list).toContainText("Empty Island");
+  await modal
+    .getByRole("combobox", { name: "Filter graph connections" })
+    .selectOption("all");
+  await modal
+    .getByRole("combobox", { name: "Filter graph by tag" })
+    .selectOption("api");
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(2);
+  await list.getByRole("button", { name: /Beacon/ }).click();
+  await details
+    .getByRole("combobox", { name: "Link direction" })
+    .selectOption("incoming");
+  await expect(details).toContainText("Atlas Hub");
+  await expect(details).toContainText("2 links");
+  const axe = await new AxeBuilder({ page }).analyze();
+  expect(
+    axe.violations
+      .filter((v) => v.impact === "serious" || v.impact === "critical")
+      .map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })),
+  ).toEqual([]);
+  await page.screenshot({
+    path: "test-results/workspace-graph-desktop.png",
+    fullPage: true,
+  });
+  await modal
+    .getByRole("button", { name: "Center selected", exact: true })
+    .click();
+  await canvas.scrollIntoViewIfNeeded();
+  const openBounds = await canvas.boundingBox();
+  if (!openBounds) throw new Error("Graph canvas is not visible");
+  await canvas.dblclick({
+    position: { x: openBounds.width / 2, y: openBounds.height / 2 },
+  });
+  await expect(modal).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Beacon", exact: true }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("keeps the graph usable on mobile and paginates large document lists", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles(
+      Array.from({ length: 60 }, (_, i) => ({
+        name: `Orbit${String(i).padStart(2, "0")}.md`,
+        mimeType: "text/markdown",
+        buffer: Buffer.from(`# Orbit ${i}`),
+      })),
+    );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Open file navigation", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Workspace graph", exact: true })
+    .click();
+  const modal = page.getByRole("dialog", {
+    name: "Workspace graph",
+    exact: true,
+  });
+  const list = modal.getByRole("region", { name: "Graph document list" });
+  await modal
+    .getByRole("textbox", { name: "Search graph documents" })
+    .fill("Orbit");
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(40);
+  await list
+    .getByRole("button", { name: "Next documents", exact: true })
+    .click();
+  await expect(list.locator(".workspace-graph-list button")).toHaveCount(20);
+  await list.getByRole("button", { name: /Orbit 59/ }).click();
+  await expect(
+    modal.getByRole("region", { name: "Selected graph document" }),
+  ).toContainText("Orbit59.md");
+  await expect
+    .poll(() =>
+      modal.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: "test-results/workspace-graph-mobile.png",
+    fullPage: true,
+  });
+  await modal
+    .getByRole("button", { name: "Open document", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Orbit 59", exact: true }),
+  ).toBeVisible();
+});
+
+test("indexes and explores a thousand-document workspace without creating a thousand DOM rows", async ({
+  page,
+}, testInfo) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open("openmdviewer");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction(["documents", "workspaces"], "readwrite");
+        const now = Date.now();
+        tx.objectStore("workspaces").put({
+          id: "graph-fixture",
+          name: "Graph fixture",
+          description: "Synthetic browser test",
+          icon: "🧪",
+          initialized: true,
+          createdAt: now,
+        });
+        for (let i = 0; i < 1200; i++) {
+          tx.objectStore("documents").put({
+            id: `graph-${i}`,
+            workspaceId: "graph-fixture",
+            path: `Scale/Node${String(i).padStart(4, "0")}.md`,
+            content: `# Scale node ${i}\n\n${i < 1199 ? `[Next](Node${String(i + 1).padStart(4, "0")}.md)` : "End of chain."}`,
+            tags: [`group-${i % 5}`],
+            favorite: false,
+            scroll: 0,
+            createdAt: now,
+            updatedAt: now,
+            revision: 0,
+          });
+        }
+        tx.oncomplete = () => {
+          db.close();
+          localStorage.setItem("openmdviewer.workspace", "graph-fixture");
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+    });
+  });
+  const started = Date.now();
+  await page.reload();
+  await expect(page.getByText("1200 documents, all local")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Workspace graph", exact: true })
+    .click();
+  const modal = page.getByRole("dialog", {
+    name: "Workspace graph",
+    exact: true,
+  });
+  await expect(modal.locator(".workspace-graph-summary")).toHaveText(
+    "1200 of 1200 documents · 1199 directed connections shown · 0 isolated in workspace",
+  );
+  const readyMs = Date.now() - started;
+  await expect(modal.locator("canvas")).toBeVisible();
+  await expect(modal.locator(".workspace-graph-list button")).toHaveCount(40);
+  await expect
+    .poll(() =>
+      modal.locator("canvas").evaluate((node: HTMLCanvasElement) => {
+        const ctx = node.getContext("2d");
+        if (!ctx) return 0;
+        const data = ctx.getImageData(0, 0, node.width, node.height).data;
+        let pixels = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i]) pixels++;
+        return pixels;
+      }),
+    )
+    .toBeGreaterThan(1000);
+  await page.screenshot({
+    path: "test-results/workspace-graph-scale.png",
+    fullPage: true,
+  });
+  await modal
+    .getByRole("textbox", { name: "Search graph documents" })
+    .fill("Node1199.md");
+  await expect(modal.locator(".workspace-graph-list button")).toHaveCount(1);
+  await modal.locator(".workspace-graph-list button").click();
+  await modal
+    .getByRole("button", { name: "Explore connections", exact: true })
+    .click();
+  await expect(modal.locator(".workspace-graph-list button")).toHaveCount(2);
+  await modal
+    .getByRole("button", { name: "Open document", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Scale node 1199", exact: true }),
+  ).toBeVisible();
+  await testInfo.attach("synthetic-graph-observation", {
+    body: JSON.stringify({
+      documents: 1200,
+      directedConnections: 1199,
+      visibleListRows: 40,
+      reloadIndexAndGraphReadyMs: readyMs,
+      browser: "Chromium",
+      scope:
+        "One synthetic chain fixture on this runner; not a universal latency guarantee.",
+    }),
+    contentType: "application/json",
+  });
 });

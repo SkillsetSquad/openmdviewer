@@ -2666,3 +2666,308 @@ kbd {
     padding: 0 16px 16px;
   }
 }
+
+/* Workspace graph: bounded DOM lists accompany the canvas for keyboard access. */
+.app-dialog.wide.workspace-graph-dialog {
+  width: min(1100px, calc(100vw - 28px));
+  max-height: 92dvh;
+}
+.workspace-graph-content {
+  padding: 0 24px 24px;
+}
+.workspace-graph-filters {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.workspace-graph-filters label,
+.workspace-graph-relation-label {
+  display: flex;
+  gap: 5px;
+  flex-direction: column;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.workspace-graph-filters input,
+.workspace-graph-filters select,
+.workspace-graph-focus select,
+.workspace-graph-relation-label select {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--foreground);
+  min-height: 36px;
+  padding: 6px 10px;
+  max-width: 100%;
+}
+.workspace-graph-filters .workspace-graph-search {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  position: relative;
+  min-width: 180px;
+}
+.workspace-graph-search svg {
+  position: absolute;
+  left: 10px;
+}
+.workspace-graph-search input {
+  width: 100%;
+  padding-left: 33px;
+}
+.workspace-graph-focus {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  font-size: 12px;
+}
+.workspace-graph-focus span {
+  overflow-wrap: anywhere;
+}
+.workspace-graph-summary {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 12px 0;
+  margin: 0;
+}
+.workspace-graph-stage {
+  position: relative;
+  height: clamp(250px, 40dvh, 440px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--app-bg);
+}
+.workspace-graph-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.workspace-graph-stage canvas:active {
+  cursor: grabbing;
+}
+.workspace-graph-stage canvas:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: -3px;
+}
+.workspace-graph-tools {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 20px);
+}
+.workspace-graph-tools button {
+  background: var(--app-bg);
+  font-size: 11px;
+}
+.workspace-graph-tools output {
+  font-size: 10px;
+  padding: 4px;
+  background: var(--app-bg);
+}
+.workspace-graph-empty {
+  position: absolute;
+  top: 40%;
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+.workspace-graph-hint {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  line-height: 1.65;
+  margin: 10px 0;
+}
+.workspace-graph-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--border);
+  margin-top: 15px;
+}
+.workspace-graph-bottom section {
+  min-width: 0;
+  padding-top: 16px;
+}
+.workspace-graph-documents {
+  padding-right: 20px;
+}
+.workspace-graph-details {
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+}
+.workspace-graph-bottom h3 {
+  font-size: 12px;
+  margin-bottom: 12px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+.workspace-graph-bottom h3 small {
+  font-weight: 400;
+  margin-left: 8px;
+}
+.workspace-graph-list,
+.workspace-graph-related {
+  max-height: 280px;
+  overflow: auto;
+}
+.workspace-graph-list button,
+.workspace-graph-related button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.workspace-graph-list button:hover,
+.workspace-graph-related button:hover {
+  background: var(--elevated-hover);
+}
+.workspace-graph-list button.selected {
+  background: var(--selection-bg);
+  border-color: var(--accent-blue);
+}
+.workspace-graph-list button > span,
+.workspace-graph-related button > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workspace-graph-list button > small,
+.workspace-graph-related button > small {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+.workspace-graph-list strong {
+  display: block;
+  font-weight: 500;
+}
+.workspace-graph-list span small,
+.workspace-graph-related span small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  margin-top: 3px;
+}
+.workspace-graph-list i,
+.workspace-graph-tags i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.workspace-graph-details > strong {
+  display: block;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.workspace-graph-path {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+  margin: 4px 0 10px;
+}
+.workspace-graph-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.workspace-graph-tags button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.workspace-graph-detail-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.workspace-graph-detail-actions button {
+  font-size: 11px;
+}
+.workspace-graph-relation-label {
+  max-width: 200px;
+}
+.workspace-graph-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 12px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.workspace-graph-pagination button {
+  font-size: 10px;
+}
+.graph-panel > button {
+  margin-top: 12px;
+}
+@media (max-width: 650px) {
+  .workspace-graph-content {
+    padding: 0 14px 18px;
+  }
+  .workspace-graph-filters .workspace-graph-search {
+    flex-basis: 100%;
+  }
+  .workspace-graph-filters > label:not(.workspace-graph-search) {
+    flex: 1;
+    min-width: 0;
+  }
+  .workspace-graph-bottom {
+    grid-template-columns: 1fr;
+  }
+  .workspace-graph-documents {
+    padding-right: 0;
+  }
+  .workspace-graph-details {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    margin-top: 16px;
+  }
+  .workspace-graph-tools button {
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+  .workspace-graph-focus select {
+    width: 100%;
+  }
+}
+
+.workspace-graph-dialog > .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--app-bg);
+  padding-bottom: 14px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+.workspace-graph-content > .dialog-description {
+  margin-top: 16px;
+}
