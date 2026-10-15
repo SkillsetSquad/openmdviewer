@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "public/search-worker.js",
     "public/regex-worker.js",
+    "public/repository-diff-worker.js",
     "public/conversion-worker.js",
     "public/site-worker.js",
     "public/docx-export-worker.js",

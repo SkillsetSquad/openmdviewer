@@ -5005,3 +5005,45 @@ kbd {
 .repository-preview [id] {
   scroll-margin-top: 80px;
 }
+
+.repository-comparison {
+  margin-block: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.repository-comparison select {
+  max-width: 100%;
+}
+.repository-comparison p,
+.repository-comparison a {
+  overflow-wrap: anywhere;
+}
+.repository-diff {
+  max-height: 420px;
+  overflow: auto;
+  font:
+    12px/1.7 var(--font-mono),
+    monospace;
+  border: 1px solid var(--border);
+}
+.repository-diff-line {
+  display: grid;
+  grid-template-columns: 2ch 5ch 5ch minmax(max-content, 1fr);
+  min-width: max-content;
+  padding-inline: 6px;
+}
+.repository-diff-line > span {
+  user-select: none;
+}
+.repository-diff-line code {
+  white-space: pre;
+  font: inherit;
+}
+.repository-diff-line.added {
+  background: color-mix(in srgb, #22c55e 13%, transparent);
+}
+.repository-diff-line.removed {
+  background: color-mix(in srgb, #f87171 13%, transparent);
+}

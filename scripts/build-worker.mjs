@@ -3,6 +3,7 @@ import { cp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { zipSync } from "fflate";
 const result = await build({
   entryPoints: {
+    "repository-diff-worker": "src/workers/repository-diff.worker.ts",
     "docx-export-worker": "src/workers/docx-export.worker.ts",
     "site-worker": "src/workers/site.worker.ts",
     "conversion-worker": "src/workers/conversion.worker.ts",

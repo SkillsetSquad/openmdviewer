@@ -60,3 +60,5 @@ next-env.d.ts
 /public/pdf-LICENSE.txt
 
 /public/docx-export-worker.js
+
+/public/repository-diff-worker.js

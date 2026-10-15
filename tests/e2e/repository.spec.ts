@@ -494,3 +494,166 @@ test("a Git LFS image pointer fails the complete import without fetching externa
   expect(await allData(page)).toEqual(before);
   expect(external).toEqual([]);
 });
+
+test("compares the exact path across immutable Git snapshots without importing or modifying local documents", async ({
+  page,
+  context,
+}) => {
+  const changed = Buffer.from(
+    "# Changed README\n\nNew branch text.\n<script>window.DIFF_SCRIPT_EXECUTED=true</script>\n" +
+      Array.from({ length: 130 }, (_, index) => `Added line ${index}`).join(
+        "\n",
+      ),
+  );
+  const changedSha = gitBlob(changed);
+  await mock(context, (url, result) => {
+    if (url.includes(`/git/trees/${trees.feature}`)) {
+      const data = JSON.parse(result.body.toString());
+      const readme = data.tree.find(
+        (entry: { path: string }) => entry.path === "README.md",
+      );
+      readme.sha = changedSha;
+      readme.size = changed.length;
+      return { ...result, body: Buffer.from(JSON.stringify(data)) };
+    }
+    if (url.includes(`/git/blobs/${changedSha}`))
+      return { ...result, status: 200, body: changed };
+    return result;
+  });
+  const before = await allData(page);
+  const dialog = await connect(page);
+  await dialog
+    .getByText("Compare this file across Git references", { exact: true })
+    .click();
+  await dialog
+    .getByLabel("Compare with branch or tag", { exact: true })
+    .selectOption("branch:feature/docs");
+  await dialog
+    .getByRole("button", { name: "Compare pinned file", exact: true })
+    .click();
+  const comparison = dialog.getByRole("region", {
+    name: "Git file comparison",
+    exact: true,
+  });
+  await expect(
+    comparison.getByText(`After: branch feature/docs · ${commits.feature}`, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    comparison.getByText(`Before: branch main · ${commits.main}`, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    comparison
+      .locator(".repository-diff-line.added code")
+      .filter({ hasText: "New branch text." }),
+  ).toBeVisible();
+  await expect(
+    comparison
+      .locator(".repository-diff-line.removed code")
+      .filter({ hasText: "# Repository README" }),
+  ).toBeVisible();
+  await expect(
+    comparison.getByRole("link", { name: "View comparison file on GitHub" }),
+  ).toHaveAttribute(
+    "href",
+    `https://github.com/example/manual/blob/${commits.feature}/README.md`,
+  );
+  expect(
+    await page.evaluate(
+      () => (window as unknown as Record<string, unknown>).DIFF_SCRIPT_EXECUTED,
+    ),
+  ).toBeUndefined();
+  expect(await allData(page)).toEqual(before);
+  await comparison
+    .getByRole("button", { name: "Next diff lines", exact: true })
+    .click();
+  await expect(
+    comparison.getByRole("button", {
+      name: "Previous diff lines",
+      exact: true,
+    }),
+  ).toBeEnabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  const accessibility = await new AxeBuilder({ page })
+    .include("dialog[open]")
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+  await page.screenshot({ path: "/tmp/openmdviewer-git-diff-mobile.png" });
+  await page.setViewportSize({ width: 1586, height: 992 });
+  await comparison
+    .getByRole("button", { name: "Previous diff lines", exact: true })
+    .click();
+  await page.screenshot({ path: "/tmp/openmdviewer-git-diff-desktop.png" });
+  await dialog
+    .getByLabel("Compare with branch or tag", { exact: true })
+    .selectOption("tag:v1.0");
+  await expect(comparison).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Compare pinned file", exact: true })
+    .click();
+  await expect(
+    dialog.getByText("Files are identical.", { exact: true }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Source preview", exact: true })
+    .click();
+  await expect(dialog.getByLabel("Repository Markdown source")).toHaveValue(
+    fixtureFiles["README.md"].toString(),
+  );
+  await dialog
+    .getByRole("button", { name: "Folder docs", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Preview Guide.md", exact: true })
+    .click();
+  await expect(comparison).toHaveCount(0);
+});
+
+test("a missing comparison path reports failure while retaining the pinned preview and import selection", async ({
+  page,
+  context,
+}) => {
+  await mock(context, (url, result) => {
+    if (url.includes(`/git/trees/${trees.feature}`)) {
+      const data = JSON.parse(result.body.toString());
+      data.tree = data.tree.filter(
+        (entry: { path: string }) => entry.path !== "README.md",
+      );
+      return { ...result, body: Buffer.from(JSON.stringify(data)) };
+    }
+    return result;
+  });
+  const dialog = await connect(page);
+  await dialog
+    .getByText("Compare this file across Git references", { exact: true })
+    .click();
+  await dialog
+    .getByLabel("Compare with branch or tag", { exact: true })
+    .selectOption("branch:feature/docs");
+  await dialog
+    .getByRole("button", { name: "Compare pinned file", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "This path is absent from the comparison commit",
+  );
+  await expect(
+    dialog.getByRole("region", { name: "Git file comparison" }),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole("heading", { name: "Repository README", exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByLabel("Select README.md", { exact: true }),
+  ).toBeChecked();
+  await expect(dialog.getByLabel("Branch or tag", { exact: true })).toHaveValue(
+    "branch:main",
+  );
+});

@@ -19,6 +19,11 @@ import {
   repositoryEntrySupported,
   repositoryTextDocument,
 } from "@/lib/repositories/import";
+import {
+  compareRepositoryFile,
+  repositoryDiff,
+} from "@/lib/repositories/compare";
+import { repositoryDiffInWorker } from "@/lib/repositories/diff-client";
 import { storage } from "@/lib/storage";
 import { resolvePath } from "@/lib/paths";
 export default function RepositoryDialog({
@@ -58,6 +63,13 @@ export default function RepositoryDialog({
     [saving, setSaving] = useState(false),
     [message, setMessage] = useState(""),
     [rate, setRate] = useState<RepositoryRate | null>(null);
+  const [compareRef, setCompareRef] = useState("");
+  const [comparison, setComparison] = useState<{
+    snapshot: RepositorySnapshot;
+    blob: string;
+    diff: ReturnType<typeof repositoryDiff>;
+  } | null>(null);
+  const [diffOffset, setDiffOffset] = useState(0);
   const pendingAnchor = useRef("");
   useEffect(() => {
     if (!preview || !pendingAnchor.current) return;
@@ -128,6 +140,8 @@ export default function RepositoryDialog({
     entry: RepositoryEntry,
     signal: AbortSignal,
   ) {
+    setComparison(null);
+    setDiffOffset(0);
     if (!repositoryTextDocument(entry.path)) {
       setPreview(null);
       setMessage(
@@ -150,6 +164,7 @@ export default function RepositoryDialog({
     ref: RepositoryRef,
     signal: AbortSignal,
   ) {
+    setComparison(null);
     setSnapshot(null);
     setEntries([]);
     setPreview(null);
@@ -184,6 +199,7 @@ export default function RepositoryDialog({
       adapter.current?.dispose();
       const client = new GitHubRepository(id, value, reportRate);
       adapter.current = client;
+      setComparison(null);
       setInfo(null);
       setSnapshot(null);
       setEntries([]);
@@ -596,6 +612,165 @@ export default function RepositoryDialog({
                         Source preview
                       </Button>
                     </div>
+                    <details className="repository-comparison">
+                      <summary>Compare this file across Git references</summary>
+                      <p>
+                        Compare the current pinned file (before) with the same
+                        path at another branch or tag (after). References
+                        resolve only when you request a comparison.
+                      </p>
+                      <label htmlFor="repository-compare-ref">
+                        Compare with branch or tag
+                      </label>
+                      <select
+                        id="repository-compare-ref"
+                        value={compareRef}
+                        disabled={busy}
+                        onChange={(event) => {
+                          setCompareRef(event.target.value);
+                          setComparison(null);
+                        }}
+                      >
+                        <option value="">Choose a reference</option>
+                        {refs.map((ref) => (
+                          <option
+                            key={`${ref.kind}:${ref.name}`}
+                            value={`${ref.kind}:${ref.name}`}
+                          >
+                            {ref.kind}: {ref.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        variant="outline"
+                        disabled={busy || !compareRef}
+                        onClick={() => {
+                          const ref = refs.find(
+                            (item) =>
+                              `${item.kind}:${item.name}` === compareRef,
+                          );
+                          if (!ref || !adapter.current) return;
+                          setComparison(null);
+                          void run(async (signal) => {
+                            const result = await compareRepositoryFile(
+                              adapter.current!,
+                              preview.entry.path,
+                              ref,
+                              signal,
+                            );
+                            const diff = await repositoryDiffInWorker(
+                              preview.text,
+                              result.text,
+                              signal,
+                            );
+                            signal.throwIfAborted();
+                            setDiffOffset(0);
+                            setComparison({
+                              snapshot: result.snapshot,
+                              blob: result.blob,
+                              diff,
+                            });
+                            setMessage(
+                              "Comparison ready. Repository files and local workspaces are unchanged.",
+                            );
+                          });
+                        }}
+                      >
+                        Compare pinned file
+                      </Button>
+                      {comparison && (
+                        <section aria-label="Git file comparison">
+                          <p>
+                            Before: {snapshot.ref.kind} {snapshot.ref.name} ·{" "}
+                            {snapshot.commit}
+                          </p>
+                          <p>
+                            After: {comparison.snapshot.ref.kind}{" "}
+                            {comparison.snapshot.ref.name} ·{" "}
+                            {comparison.snapshot.commit}
+                          </p>
+                          <a
+                            href={repositoryFileURL({
+                              ...snapshot.repository,
+                              provider: "github",
+                              ref: comparison.snapshot.ref,
+                              commit: comparison.snapshot.commit,
+                              path: preview.entry.path,
+                              blob: comparison.blob,
+                            })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View comparison file on GitHub
+                          </a>
+                          <p>
+                            {comparison.diff.identical
+                              ? "Files are identical."
+                              : `${comparison.diff.added} added lines · ${comparison.diff.removed} removed lines`}
+                          </p>
+                          <p>
+                            − removed · + added · blank unchanged. Line numbers
+                            are before / after. Line endings and final-newline
+                            differences count as changes.
+                          </p>
+                          <div
+                            className="repository-diff"
+                            tabIndex={0}
+                            role="region"
+                            aria-label="Read-only line diff"
+                          >
+                            {comparison.diff.rows
+                              .slice(diffOffset, diffOffset + 100)
+                              .map((row, index) => (
+                                <div
+                                  className={`repository-diff-line ${row.kind}`}
+                                  key={diffOffset + index}
+                                >
+                                  <span>
+                                    {row.kind === "added"
+                                      ? "+"
+                                      : row.kind === "removed"
+                                        ? "−"
+                                        : " "}
+                                  </span>
+                                  <span>{row.before ?? "·"}</span>
+                                  <span>{row.after ?? "·"}</span>
+                                  <code>{row.text || " "}</code>
+                                </div>
+                              ))}
+                          </div>
+                          <p>
+                            {comparison.diff.rows.length
+                              ? `${diffOffset + 1}–${Math.min(diffOffset + 100, comparison.diff.rows.length)} of ${comparison.diff.rows.length} diff lines`
+                              : "No diff lines"}
+                          </p>
+                          <div className="repository-buttons">
+                            <Button
+                              variant="outline"
+                              disabled={!diffOffset}
+                              onClick={() =>
+                                setDiffOffset((value) =>
+                                  Math.max(0, value - 100),
+                                )
+                              }
+                            >
+                              Previous diff lines
+                            </Button>
+                            <Button
+                              variant="outline"
+                              disabled={
+                                diffOffset + 100 >= comparison.diff.rows.length
+                              }
+                              onClick={() =>
+                                setDiffOffset((value) => value + 100)
+                              }
+                            >
+                              Next diff lines
+                            </Button>
+                          </div>
+                        </section>
+                      )}
+                    </details>
                     {sourceView ? (
                       <textarea
                         aria-label="Repository Markdown source"
