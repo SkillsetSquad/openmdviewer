@@ -2396,3 +2396,23 @@ kbd {
   backdrop-filter: blur(3px);
   color: white;
 }
+.app-update {
+  position: fixed;
+  right: 20px;
+  bottom: 38px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 15px;
+  border: 1px solid var(--accent-blue);
+  border-radius: 8px;
+  background: var(--elevated);
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  max-width: calc(100vw - 40px);
+}
+.app-update button {
+  color: var(--accent-blue);
+  font-weight: 550;
+}

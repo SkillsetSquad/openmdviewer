@@ -74,7 +74,7 @@ self.addEventListener('message',event=>{if(event.data==='ACTIVATE_UPDATE')self.s
 self.addEventListener('fetch',event=>{
  const url=new URL(event.request.url);
  if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
- if(event.request.mode==='navigate')event.respondWith(fetch(event.request).catch(()=>caches.match(${JSON.stringify(base + "/")})));
+ if(event.request.mode==='navigate'&&(url.pathname===${JSON.stringify(base + "/")}||url.pathname===${JSON.stringify(base + "/index.html")}))event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(${JSON.stringify(base + "/")}))||fetch(event.request)));
  else if(ALLOWED.has(url.pathname))event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(event.request))||fetch(event.request)));
 });
 `,

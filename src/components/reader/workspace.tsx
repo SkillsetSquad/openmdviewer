@@ -52,6 +52,7 @@ import { FileTree } from "./file-tree";
 import { Modal } from "./modal";
 import { Markdown } from "./markdown";
 import { useLocalSearch } from "@/hooks/use-local-search";
+import { useAppUpdates } from "@/hooks/use-app-updates";
 import { useWorkspaceSession } from "@/hooks/use-workspace-session";
 import { WorkspaceManager } from "./workspace-manager";
 import { RevisionHistory, WorkspaceTrash } from "./recovery";
@@ -75,7 +76,6 @@ import {
   supportedFile,
 } from "@/lib/documents";
 import type { ReaderDocument, ReaderTheme } from "@/lib/types";
-import { basePath } from "@/lib/types";
 const Editor = lazy(() => import("./editor"));
 type DialogName =
   | "search"
@@ -216,12 +216,7 @@ export default function Workspace() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [flushEdit, storageStatus, conflict, hasPendingChanges]);
-  useEffect(() => {
-    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production")
-      navigator.serviceWorker
-        .register(`${basePath}/sw.js`, { scope: `${basePath}/` })
-        .catch(() => {});
-  }, []);
+  const appUpdate = useAppUpdates(flushEdit, notify);
   const openDocument = useCallback(
     (id: string) => {
       flushEdit();
@@ -1497,6 +1492,19 @@ export default function Workspace() {
           Exit {presentation ? "presentation" : "focus"}
           <kbd>esc</kbd>
         </button>
+      )}
+      {appUpdate.available && (
+        <div className="app-update" role="status">
+          <span>A new version is ready.</span>
+          <button
+            disabled={appUpdate.applying}
+            onClick={() => void appUpdate.apply()}
+          >
+            {appUpdate.applying
+              ? "Saving and updating…"
+              : "Apply application update"}
+          </button>
+        </div>
       )}
       {toast && (
         <div className="toast" role="status">

@@ -540,3 +540,75 @@ test("migrates an existing browser database and preserves local media", async ({
     page.getByRole("button", { name: "Legacy.md", exact: true }),
   ).toBeVisible();
 });
+
+test("applies an application update after preserving pending edits", async ({
+  page,
+}) => {
+  const { readFile, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const root = process.env.STATIC_TEST_DIR || "out";
+  const script = join(
+    root,
+    process.env.TEST_BASE_PATH ? "openmdviewer" : "",
+    "sw.js",
+  );
+  const original = await readFile(script, "utf8");
+  try {
+    await page.goto("./");
+    await expect(
+      page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+    ).toBeVisible();
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+    await page
+      .locator("input[type=file]")
+      .first()
+      .setInputFiles({
+        name: "Update.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("# Before the update"),
+      });
+    await page.getByRole("button", { name: "Split view", exact: true }).click();
+    await writeFile(
+      script,
+      original.replace(
+        /const CACHE="([^"]+)";/,
+        `const CACHE="$1-test-update";`,
+      ),
+    );
+    await page.evaluate(async () => {
+      const r = await navigator.serviceWorker.getRegistration();
+      await r?.update();
+    });
+    await expect(
+      page.getByRole("button", {
+        name: "Apply application update",
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30000 });
+    await page
+      .locator(".cm-content")
+      .fill("# Preserved through update\n\nDo not lose this edit.");
+    await Promise.all([
+      page.waitForEvent("load"),
+      page
+        .getByRole("button", { name: "Apply application update", exact: true })
+        .click(),
+    ]);
+    await expect(
+      page.getByRole("heading", {
+        name: "Preserved through update",
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 30000 });
+    expect(
+      await page.evaluate(async () =>
+        (await caches.keys()).some((key) => key.endsWith("-test-update")),
+      ),
+    ).toBe(true);
+  } finally {
+    await writeFile(script, original);
+  }
+});
