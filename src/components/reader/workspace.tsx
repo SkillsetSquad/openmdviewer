@@ -104,6 +104,7 @@ import type {
   TextQuote,
 } from "@/lib/types";
 const ConversionDialog = lazy(() => import("./conversion-dialog"));
+const URLImportDialog = lazy(() => import("./url-import-dialog"));
 const RepositoryDialog = lazy(() => import("./repository-dialog"));
 const DocxExportDialog = lazy(() => import("./docx-export-dialog"));
 const SiteExportDialog = lazy(() => import("./site-export-dialog"));
@@ -124,6 +125,7 @@ type DialogName =
   | "exportDocx"
   | "exportSite"
   | "convertImport"
+  | "urlImport"
   | "repository"
   | "localDirectory"
   | "localFile"
@@ -756,6 +758,9 @@ export default function Workspace() {
         case "files":
           filesRef.current?.click();
           break;
+        case "urlImport":
+          setDialog("urlImport");
+          break;
         case "repository":
           setDialog("repository");
           break;
@@ -1115,6 +1120,12 @@ export default function Workspace() {
                   onClick={() => setDialog("localFile")}
                 >
                   <HardDrive size={15} />
+                </IconButton>
+                <IconButton
+                  label="Open Markdown URL"
+                  onClick={() => setDialog("urlImport")}
+                >
+                  <Link2 size={15} />
                 </IconButton>
                 <IconButton
                   label="Browse GitHub repository"
@@ -2109,6 +2120,35 @@ export default function Workspace() {
             }}
             onCommand={(id) => void runCommand(id)}
             onOpen={(id, hit) => void openSearchResult(id, hit)}
+          />
+        </Suspense>
+      )}
+      {dialog === "urlImport" && (
+        <Suspense
+          fallback={
+            <Modal title="Open Markdown URL" onClose={() => setDialog(null)}>
+              <p role="status">Loading URL importer…</p>
+            </Modal>
+          }
+        >
+          <URLImportDialog
+            workspaceId={workspaceId}
+            workspaceName={
+              workspaces.find((item) => item.id === workspaceId)?.name ||
+              "the selected workspace"
+            }
+            onBusy={setLocalFileBusy}
+            onClose={() => setDialog(null)}
+            onApply={async (document, targetWorkspaceId) => {
+              if (!(await flushEdit()))
+                throw new Error(
+                  "Resolve pending browser saves before importing.",
+                );
+              await persistImport(
+                { documents: [document], assets: [] },
+                targetWorkspaceId,
+              );
+            }}
           />
         </Suspense>
       )}

@@ -5047,3 +5047,61 @@ kbd {
 .repository-diff-line.removed {
   background: color-mix(in srgb, #f87171 13%, transparent);
 }
+
+.url-import-body {
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.url-import-body form {
+  display: grid;
+  gap: 10px;
+}
+.url-import-body input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--app-bg);
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.url-import-body p {
+  overflow-wrap: anywhere;
+}
+.url-import-preview {
+  min-width: 0;
+  max-height: 55vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.url-import-preview textarea {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  font: 12px/1.6 monospace;
+  background: transparent;
+  color: inherit;
+}
+.url-import-preview .markdown-body {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+}
+.url-import-dialog .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--app-bg);
+}
+.url-import-preview [id] {
+  scroll-margin-top: 80px;
+}
+@media (max-width: 700px) {
+  .url-import-body {
+    padding: 16px;
+  }
+}

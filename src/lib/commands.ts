@@ -8,6 +8,11 @@ export const commands = [
     quick: true,
   },
   {
+    id: "urlImport",
+    label: "Open Markdown URL",
+    keywords: "remote fetch raw link import http https",
+  },
+  {
     id: "repository",
     label: "Browse GitHub repository",
     keywords: "remote public private branch tag readme import git",

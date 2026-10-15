@@ -56,6 +56,7 @@ const icons = {
   exportSite: BookOpen,
   exportDocx: FileText,
   repository: BookOpen,
+  urlImport: Link2,
   workspaces: FolderOpen,
   theme: Moon,
   health: ShieldCheck,
