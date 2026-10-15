@@ -1,4 +1,5 @@
 "use client";
+import type { CommandId } from "@/lib/commands";
 import type { HealthIssue } from "@/lib/health";
 import { resolveDocumentLink } from "@/lib/references";
 import {
@@ -23,7 +24,6 @@ import {
   Code2,
   Copy,
   ExternalLink,
-  FilePlus2,
   FileText,
   FolderOpen,
   GitFork as Github,
@@ -78,6 +78,7 @@ import {
   supportedFile,
 } from "@/lib/documents";
 import type { ReaderDocument, ReaderTheme } from "@/lib/types";
+const CommandPalette = lazy(() => import("./command-palette"));
 const WorkspaceGraph = lazy(() => import("./workspace-graph"));
 const Insights = lazy(() => import("./insights"));
 const DocumentProperties = lazy(() => import("./document-properties"));
@@ -289,11 +290,25 @@ export default function Workspace() {
   );
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
+      const modalOpen = !!document.querySelector("dialog[open]");
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        if (modalOpen) {
+          const input = document.querySelector<HTMLInputElement>(
+            ".command-palette-dialog input[role=combobox]",
+          );
+          if (input) {
+            input.focus();
+            input.select();
+          }
+          return;
+        }
         setDialog("search");
         setQuery("");
+        return;
       }
+      // Dialogs own their keyboard interaction; do not run background actions.
+      if (modalOpen) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
         e.preventDefault();
         filesRef.current?.click();
@@ -446,6 +461,107 @@ export default function Workspace() {
       notify("Clipboard unavailable. Use Export to download this document.");
     }
   }
+  function printDocument() {
+    setDialog(null);
+    setMode("read");
+    // Let React remove the modal and restore the rendered document before print.
+    requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+  }
+  async function runCommand(id: CommandId) {
+    setDialog(null);
+    try {
+      switch (id) {
+        case "files":
+          filesRef.current?.click();
+          break;
+        case "folder":
+          folderRef.current?.click();
+          break;
+        case "new":
+          setFormValue("Untitled.md");
+          setDialog("new");
+          break;
+        case "graph":
+          setDialog("graph");
+          break;
+        case "settings":
+          setDialog("settings");
+          break;
+        case "workspaces":
+          setDialog("workspaces");
+          break;
+        case "theme":
+          setPreferences({ theme: dark ? "light" : "dark" });
+          break;
+        case "focus":
+          setFocus((value) => !value);
+          break;
+        case "health":
+          await flushEdit();
+          setDialog("health");
+          break;
+        case "trash":
+          setDialog("trash");
+          break;
+        case "help":
+          setDialog("help");
+          break;
+        case "exportZip":
+          await exportZip();
+          break;
+        case "read":
+          if (doc) setMode("read");
+          break;
+        case "source":
+          if (doc) setMode("source");
+          break;
+        case "split":
+          if (doc) setMode("split");
+          break;
+        case "backlinks":
+          if (doc) {
+            setPanel("backlinks");
+            setRightOpen(true);
+            if (window.innerWidth <= 1000) setLeftOpen(false);
+          }
+          break;
+        case "analyze":
+          if (doc) {
+            await flushEdit();
+            setDialog("analyze");
+          }
+          break;
+        case "properties":
+          if (doc) setDialog("properties");
+          break;
+        case "history":
+          if (doc) {
+            await flushEdit();
+            setDialog("history");
+          }
+          break;
+        case "copy":
+          if (doc) await copy(doc.content, "Markdown copied.");
+          break;
+        case "exportMarkdown":
+          if (doc) download(doc.path, doc.content);
+          break;
+        case "exportPdf":
+          if (doc) printDocument();
+          break;
+        case "presentation":
+          if (doc) {
+            setFocus(!presentation);
+            setPresentation(!presentation);
+          }
+          break;
+      }
+    } catch {
+      notify(
+        "Could not finish that action. Your documents remain on this device.",
+      );
+    }
+  }
   function jump(id: string) {
     document
       .getElementById(id)
@@ -476,23 +592,28 @@ export default function Workspace() {
     selection?.addRange(range);
     node.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+  const commandsOnly = query.trimStart().startsWith(">");
+  const documentQuery = commandsOnly ? "" : query;
   const {
     ids: searchIds,
     failed: searchFailed,
     navigation,
     indexing,
-  } = useLocalSearch(documents, query);
-  const searching = !!query.trim() && searchIds === null && !searchFailed;
+  } = useLocalSearch(documents, documentQuery);
+  const searching =
+    !!documentQuery.trim() && searchIds === null && !searchFailed;
   const results = useMemo(
     () =>
-      searchIds
-        ? searchIds
-            .map((id) => documents.find((d) => d.id === id))
-            .filter((d): d is ReaderDocument => !!d)
-        : query.trim()
-          ? []
-          : documents.slice(0, 40),
-    [documents, query, searchIds],
+      commandsOnly
+        ? []
+        : searchIds
+          ? searchIds
+              .map((id) => documents.find((d) => d.id === id))
+              .filter((d): d is ReaderDocument => !!d)
+          : query.trim()
+            ? []
+            : documents.slice(0, 40),
+    [commandsOnly, documents, query, searchIds],
   );
   const documentSummaries = useMemo(
     () =>
@@ -1440,7 +1561,7 @@ export default function Workspace() {
                     <Maximize2 size={14} />
                     Presentation mode
                   </button>
-                  <button onClick={() => window.print()}>
+                  <button onClick={printDocument}>
                     <Printer size={14} />
                     Print<kbd>⌘ P</kbd>
                   </button>
@@ -1605,146 +1726,32 @@ export default function Workspace() {
         </div>
       )}
       {dialog === "search" && (
-        <Modal
-          title="Search your workspace"
-          onClose={() => setDialog(null)}
-          wide
+        <Suspense
+          fallback={
+            <Modal
+              title="Search your workspace"
+              onClose={() => setDialog(null)}
+            >
+              <p role="status">Loading local commands…</p>
+            </Modal>
+          }
         >
-          <div className="palette-search">
-            <Search size={20} />
-            <input
-              autoFocus
-              placeholder="Search documents, headings, or commands…"
-              aria-label="Search documents and commands"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <kbd>esc</kbd>
-          </div>
-          <div className="palette-results">
-            {!query && (
-              <>
-                <div className="result-label">QUICK ACTIONS</div>
-                {[
-                  { label: "Open files", icon: Upload, action: "files" },
-                  {
-                    label: "Open local folder",
-                    icon: FolderOpen,
-                    action: "folder",
-                  },
-                  { label: "Create document", icon: FilePlus2, action: "new" },
-                  {
-                    label: "Show workspace graph",
-                    icon: Network,
-                    action: "graph",
-                  },
-                  {
-                    label: "Reading settings",
-                    icon: Settings2,
-                    action: "settings",
-                  },
-                  {
-                    label: "Toggle focus mode",
-                    icon: Maximize2,
-                    action: "focus",
-                  },
-                  {
-                    label: "Export workspace ZIP",
-                    icon: ArrowDownToLine,
-                    action: "export",
-                  },
-                ].map(({ label, icon: Icon, action }) => (
-                  <button
-                    className="command-result"
-                    key={label}
-                    onClick={() => {
-                      setDialog(null);
-                      if (action === "files") filesRef.current?.click();
-                      if (action === "folder") folderRef.current?.click();
-                      if (action === "new") {
-                        setFormValue("Untitled.md");
-                        setDialog("new");
-                      }
-                      if (action === "settings") setDialog("settings");
-                      if (action === "graph") setDialog("graph");
-                      if (action === "focus") setFocus(!focus);
-                      if (action === "export") void exportZip();
-                    }}
-                  >
-                    <Icon size={17} />
-                    <span>{label}</span>
-                    <ChevronRight size={14} />
-                  </button>
-                ))}
-              </>
-            )}
-            <div className="result-label">
-              {query ? `${results.length} MATCHING DOCUMENTS` : "DOCUMENTS"}
-            </div>
-            {results.map((d) => (
-              <button
-                className="search-result"
-                key={d.id}
-                onClick={() => {
-                  openDocument(d.id);
-                  setDialog(null);
-                }}
-              >
-                <FileText size={18} />
-                <span>
-                  <strong>
-                    {documentSummaries[d.id]?.title || fileName(d.path)}
-                  </strong>
-                  <small>{d.path}</small>
-                  {query && (
-                    <p>
-                      {d.content
-                        .slice(
-                          Math.max(
-                            0,
-                            d.content
-                              .toLowerCase()
-                              .indexOf(query.toLowerCase()) - 40,
-                          ),
-                          Math.max(
-                            0,
-                            d.content
-                              .toLowerCase()
-                              .indexOf(query.toLowerCase()) - 40,
-                          ) + 150,
-                        )
-                        .replace(/[#*`]/g, "")}
-                    </p>
-                  )}
-                </span>
-                <ChevronRight size={14} />
-              </button>
-            ))}
-            {searching && (
-              <p className="empty-panel" role="status">
-                Searching on this device…
-              </p>
-            )}
-            {searchFailed && (
-              <p className="empty-panel" role="alert">
-                The local search worker could not finish. Reload the app to
-                rebuild the index.
-              </p>
-            )}
-            {query && !results.length && !searching && !searchFailed && (
-              <div className="empty-panel">
-                No matches. Try a different phrase, path:docs, or tag:guide.
-              </div>
-            )}
-          </div>
-          <footer className="palette-footer">
-            <span>
-              <ShieldCheck size={12} />
-              Search runs on this device
-            </span>
-            <span>Tab to navigate · Enter to open</span>
-          </footer>
-        </Modal>
+          <CommandPalette
+            query={query}
+            onQuery={setQuery}
+            documents={results}
+            summaries={documentSummaries}
+            hasDocument={!!doc}
+            searching={searching}
+            failed={searchFailed}
+            onClose={() => setDialog(null)}
+            onCommand={(id) => void runCommand(id)}
+            onOpen={(id) => {
+              openDocument(id);
+              setDialog(null);
+            }}
+          />
+        </Suspense>
       )}
       {dialog === "settings" && (
         <Modal title="Make yourself at home" onClose={() => setDialog(null)}>
@@ -1995,12 +2002,7 @@ export default function Workspace() {
               </span>
               <ArrowDownToLine size={16} />
             </button>
-            <button
-              onClick={() => {
-                setDialog(null);
-                setTimeout(() => window.print(), 100);
-              }}
-            >
+            <button onClick={printDocument}>
               <Printer />
               <span>
                 <strong>Print / Save as PDF</strong>

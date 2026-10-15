@@ -89,9 +89,9 @@ test("searches, renders math and Mermaid, and supports focus", async ({
   ).toBeVisible();
   await page.keyboard.press("Control+k");
   await page
-    .getByRole("textbox", { name: "Search documents and commands" })
+    .getByRole("combobox", { name: "Search documents and commands" })
     .fill("Markdown Showcase");
-  await page.getByRole("button", { name: /Markdown Showcase Docs/ }).click();
+  await page.getByRole("option", { name: /Markdown Showcase Docs/ }).click();
   await expect(page.locator(".katex").first()).toBeVisible();
   await expect(page.locator(".diagram-canvas svg")).toBeVisible({
     timeout: 30000,
@@ -171,9 +171,9 @@ test("starts offline and opens lazy rendering modules from the application cache
   ).toBeVisible();
   await page.keyboard.press("Control+k");
   await page
-    .getByRole("textbox", { name: "Search documents and commands" })
+    .getByRole("combobox", { name: "Search documents and commands" })
     .fill("Markdown Showcase");
-  await page.getByRole("button", { name: /Markdown Showcase Docs/ }).click();
+  await page.getByRole("option", { name: /Markdown Showcase Docs/ }).click();
   await expect(page.locator(".diagram-canvas svg")).toBeVisible({
     timeout: 30000,
   });
@@ -298,10 +298,10 @@ test("uses a compiled worker for fuzzy search instead of silently falling back",
   ).toBeVisible();
   await page.keyboard.press("Control+k");
   await page
-    .getByRole("textbox", { name: "Search documents and commands" })
+    .getByRole("combobox", { name: "Search documents and commands" })
     .fill("configuraton");
   await expect(
-    page.getByRole("button", { name: /Configuration Guide Docs/ }),
+    page.getByRole("option", { name: /Configuration Guide Docs/ }),
   ).toBeVisible();
 });
 
@@ -731,10 +731,10 @@ test("uses frontmatter metadata in local search and navigates wiki and reference
   ).toBeVisible();
   await page.keyboard.press("Control+k");
   await page
-    .getByRole("textbox", { name: "Search documents and commands" })
+    .getByRole("combobox", { name: "Search documents and commands" })
     .fill("status:approved tag:operations Morgan");
   await page
-    .getByRole("button", { name: /Operations manual Imported/ })
+    .getByRole("option", { name: /Operations manual Imported/ })
     .click();
   await expect(
     page.getByRole("heading", { name: "Start here", exact: true }),
