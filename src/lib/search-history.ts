@@ -9,10 +9,14 @@ export interface RecentSearch {
   usedAt: number;
 }
 export function searchHistoryEntry(query: string, options: SearchOptions) {
-  query = query.trim();
-  if (!query || query.length > 512 || query.startsWith(">")) return null;
+  query = options.regex ? query : query.trim();
+  if (!query || query.length > 512 || query.trimStart().startsWith(">"))
+    return null;
   const normalized: SearchOptions = {
-    literal: !!(options.literal || options.caseSensitive || options.wholeWord),
+    literal: options.regex
+      ? false
+      : !!(options.literal || options.caseSensitive || options.wholeWord),
+    ...(options.regex ? { regex: true } : {}),
     caseSensitive: !!options.caseSensitive,
     wholeWord: !!options.wholeWord,
   };
@@ -24,12 +28,13 @@ export function searchHistoryEntry(query: string, options: SearchOptions) {
       normalized.literal,
       normalized.caseSensitive,
       normalized.wholeWord,
+      ...(normalized.regex ? ["regex"] : []),
     ]),
   };
 }
 export function searchOptionsLabel(options: SearchOptions) {
   return [
-    options.literal ? "Literal" : "Fuzzy",
+    options.regex ? "Regex" : options.literal ? "Literal" : "Fuzzy",
     options.caseSensitive && "Match case",
     options.wholeWord && "Whole words",
   ]

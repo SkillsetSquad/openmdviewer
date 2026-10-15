@@ -48,3 +48,5 @@ next-env.d.ts
 /public/analysis-worker.js
 
 /public/graph-worker.js
+
+/public/regex-worker.js

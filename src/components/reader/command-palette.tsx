@@ -30,10 +30,11 @@ import { commandMatches, type CommandId } from "@/lib/commands";
 import type { DocumentSummary } from "@/lib/references";
 import type { ReaderDocument } from "@/lib/types";
 import { SearchHighlight } from "./search-highlight";
-import type {
-  SearchPage,
-  SearchOptions,
-  SearchHit,
+import {
+  hasSearchQuery,
+  type SearchPage,
+  type SearchOptions,
+  type SearchHit,
 } from "@/lib/search-results";
 import {
   searchHistoryEntry,
@@ -75,6 +76,8 @@ export default function CommandPalette({
   summaries,
   hasDocument,
   searching,
+  onCancelSearch,
+  onRetrySearch,
   failed,
   onCommand,
   onOpen,
@@ -102,6 +105,8 @@ export default function CommandPalette({
   summaries: Record<string, DocumentSummary>;
   hasDocument: boolean;
   searching: boolean;
+  onCancelSearch: () => void;
+  onRetrySearch: () => void;
   failed: boolean;
   onCommand: (id: CommandId) => void;
   onOpen: (id: string, hit?: SearchHit) => void;
@@ -121,6 +126,7 @@ export default function CommandPalette({
     [query, hasDocument],
   );
   const only = query.trimStart().startsWith(">");
+  const hasQuery = hasSearchQuery(query, options);
   const visibleDocuments = only ? [] : documents;
   const suggestions = only ? [] : page?.suggestions || [];
   const historyEntry = searchHistoryEntry(query, options);
@@ -210,17 +216,24 @@ export default function CommandPalette({
             Matching{" "}
             <select
               aria-label="Document matching"
-              value={options.literal ? "literal" : "fuzzy"}
+              value={
+                options.regex ? "regex" : options.literal ? "literal" : "fuzzy"
+              }
               onChange={(event) =>
                 onOptions(
                   event.target.value === "fuzzy"
                     ? { literal: false, caseSensitive: false, wholeWord: false }
-                    : { ...options, literal: true },
+                    : {
+                        ...options,
+                        regex: event.target.value === "regex",
+                        literal: event.target.value !== "regex",
+                      },
                 )
               }
             >
               <option value="fuzzy">Fuzzy</option>
               <option value="literal">Literal</option>
+              <option value="regex">Regex</option>
             </select>
           </label>
           <label>
@@ -230,7 +243,7 @@ export default function CommandPalette({
               onChange={(event) =>
                 onOptions({
                   ...options,
-                  literal: true,
+                  literal: !options.regex,
                   caseSensitive: event.target.checked,
                 })
               }
@@ -244,13 +257,31 @@ export default function CommandPalette({
               onChange={(event) =>
                 onOptions({
                   ...options,
-                  literal: true,
+                  literal: !options.regex,
                   wholeWord: event.target.checked,
                 })
               }
             />{" "}
             Whole words
           </label>
+        </div>
+      )}
+      {!only && options.regex && (
+        <div className="regex-search-help">
+          <p>
+            JavaScript pattern · Unicode and line anchors · Match case controls
+            i · Use [\s\S] to span lines. Filters are treated as pattern text.
+          </p>
+          {searching && (
+            <button type="button" onClick={onCancelSearch}>
+              Cancel regex search
+            </button>
+          )}
+          {page?.error && (
+            <button type="button" onClick={onRetrySearch}>
+              Retry regex search
+            </button>
+          )}
         </div>
       )}
       {!only && (
@@ -362,7 +393,7 @@ export default function CommandPalette({
         {!!matches.length && (
           <div role="group" aria-label="Commands">
             <div className="result-label" aria-hidden="true">
-              {query.trim()
+              {hasQuery
                 ? `${matches.length} MATCHING ACTIONS`
                 : "QUICK ACTIONS"}
             </div>
@@ -392,7 +423,7 @@ export default function CommandPalette({
         {!only && (
           <div role="group" aria-label="Documents">
             <div className="result-label" aria-hidden="true">
-              {query.trim()
+              {hasQuery
                 ? `${page?.total ?? visibleDocuments.length} MATCHING DOCUMENT${(page?.total ?? visibleDocuments.length) === 1 ? "" : "S"}`
                 : "DOCUMENTS"}
             </div>
@@ -423,6 +454,7 @@ export default function CommandPalette({
                         }
                         terms={terms}
                         options={options}
+                        ranges={hit?.titleRanges}
                       />
                     </strong>
                     <small>
@@ -430,6 +462,7 @@ export default function CommandPalette({
                         text={doc.path}
                         terms={terms}
                         options={options}
+                        ranges={hit?.pathRanges}
                       />
                     </small>
                     {hit?.heading && (
@@ -439,10 +472,11 @@ export default function CommandPalette({
                           text={hit.heading.text}
                           terms={terms}
                           options={options}
+                          ranges={hit.headingRanges}
                         />
                       </small>
                     )}
-                    {query.trim() && hit && (
+                    {hasQuery && hit && (
                       <span className="search-excerpt">
                         <SearchHighlight
                           text={hit.excerpt}
@@ -452,10 +486,10 @@ export default function CommandPalette({
                         />
                       </span>
                     )}
-                    {query.trim() && hit && (
+                    {hasQuery && hit && (
                       <span className="search-result-meta">
                         {hit.location
-                          ? `Line ${hit.location.line}${hit.location.sourceOnly ? " · Source" : ""}`
+                          ? `Line ${hit.location.line}${hit.location.sourceOnly ? " · Source" : ""}${!hit.location.needle.length ? " · Zero-width match" : ""}`
                           : hit.heading
                             ? "Section match"
                             : "Title, path, or metadata"}
@@ -505,16 +539,13 @@ export default function CommandPalette({
           </p>
         )}
         {page?.error && !only && <p className="empty-panel">{page.error}</p>}
-        {query.trim() &&
-          !keys.length &&
-          !page?.error &&
-          (!searching || only) && (
-            <p className="empty-panel">
-              {only
-                ? "No matching commands. Try settings, graph, or export."
-                : "No matches. Try a different phrase, path:docs, tag:guide, or > for commands."}
-            </p>
-          )}
+        {hasQuery && !keys.length && !page?.error && (!searching || only) && (
+          <p className="empty-panel">
+            {only
+              ? "No matching commands. Try settings, graph, or export."
+              : "No matches. Try a different phrase, path:docs, tag:guide, or > for commands."}
+          </p>
+        )}
       </div>
       <p className="palette-hint" id={hintId}>
         ↑ / ↓ to navigate · Enter to choose · Escape to close · Type &gt; to

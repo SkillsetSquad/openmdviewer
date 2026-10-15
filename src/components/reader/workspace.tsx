@@ -1,6 +1,7 @@
 "use client";
 import {
   defaultSearchOptions,
+  hasSearchQuery,
   type SearchOptions,
   type SearchHit,
 } from "@/lib/search-results";
@@ -827,9 +828,13 @@ export default function Workspace() {
     failed: searchFailed,
     navigation,
     indexing,
+    cancel: cancelRegexSearch,
+    retry: retryRegexSearch,
   } = useLocalSearch(documents, documentQuery, searchOptions, searchOffset);
   const searching =
-    !!documentQuery.trim() && searchIds === null && !searchFailed;
+    hasSearchQuery(documentQuery, searchOptions) &&
+    searchIds === null &&
+    !searchFailed;
   const results = useMemo(
     () =>
       commandsOnly
@@ -838,10 +843,10 @@ export default function Workspace() {
           ? searchIds
               .map((id) => documents.find((d) => d.id === id))
               .filter((d): d is ReaderDocument => !!d)
-          : query.trim()
+          : hasSearchQuery(query, searchOptions)
             ? []
             : documents.slice(0, 40),
-    [commandsOnly, documents, query, searchIds],
+    [commandsOnly, documents, query, searchIds, searchOptions],
   );
   const documentSummaries = useMemo(
     () =>
@@ -1746,7 +1751,10 @@ export default function Workspace() {
                     <button
                       key={tag}
                       onClick={() => {
-                        setQuery(`tag:${tag}`);
+                        setSearchOptions(defaultSearchOptions);
+                        setQuery(
+                          `tag:${/\s/.test(tag) && !tag.includes('"') ? `"${tag}"` : tag}`,
+                        );
                         setDialog("search");
                       }}
                     >
@@ -1997,8 +2005,13 @@ export default function Workspace() {
             summaries={documentSummaries}
             hasDocument={!!doc}
             searching={searching}
+            onCancelSearch={cancelRegexSearch}
+            onRetrySearch={retryRegexSearch}
             failed={searchFailed}
-            onClose={() => setDialog(null)}
+            onClose={() => {
+              if (searchOptions.regex) cancelRegexSearch();
+              setDialog(null);
+            }}
             onCommand={(id) => void runCommand(id)}
             onOpen={(id, hit) => void openSearchResult(id, hit)}
           />

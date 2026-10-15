@@ -1,5 +1,7 @@
 import type { SearchSuggestion } from "./search-suggestions";
+export const regexSearchTimeout = 1500;
 export interface SearchOptions {
+  regex?: boolean;
   caseSensitive: boolean;
   wholeWord: boolean;
   literal: boolean;
@@ -14,6 +16,7 @@ export interface SearchLocation {
   offset: number;
   needle: string;
   sourceOnly: boolean;
+  context?: { before: string; after: string };
 }
 export interface SearchHit {
   id: string;
@@ -25,6 +28,9 @@ export interface SearchHit {
   excerptRanges: { start: number; end: number }[];
   terms: string[];
   fuzzy: boolean;
+  titleRanges?: { start: number; end: number }[];
+  pathRanges?: { start: number; end: number }[];
+  headingRanges?: { start: number; end: number }[];
   heading?: { id: string; text: string; line: number };
   location?: SearchLocation;
 }
@@ -54,7 +60,7 @@ export function parseSearchQuery(query: string) {
   };
 }
 const word = /[\p{L}\p{N}\p{M}_]/u;
-function boundary(text: string, start: number, end: number) {
+export function wordBoundary(text: string, start: number, end: number) {
   const before =
     Array.from(text.slice(Math.max(0, start - 2), start)).at(-1) || "";
   const after =
@@ -76,7 +82,7 @@ export function literalMatches(
   const found: { start: number; end: number }[] = [];
   for (const match of text.matchAll(expression)) {
     const end = match.index + match[0].length;
-    if (!options.wholeWord || boundary(text, match.index, end))
+    if (!options.wholeWord || wordBoundary(text, match.index, end))
       found.push({ start: match.index, end });
     if (found.length >= limit) break;
   }
@@ -118,6 +124,7 @@ export function searchExcerpt(
   fallbackStart = 0,
   terms: string[] = [],
   options: SearchOptions = defaultSearchOptions,
+  sourceRanges?: { start: number; end: number }[],
 ) {
   let start = position >= 0 ? Math.max(0, position - 40) : fallbackStart;
   if (
@@ -133,15 +140,24 @@ export function searchExcerpt(
     prefix.length +
     normalize(raw.slice(0, Math.max(0, Math.min(raw.length, offset)))).length;
   // Check word boundaries against the full source, not an artificial excerpt edge.
-  const matched = terms
-    .flatMap((term) =>
-      literalMatches(raw, term, { ...options, wholeWord: false }, 220),
-    )
-    .filter(
-      (range) =>
-        !options.wholeWord ||
-        boundary(content, start + range.start, start + range.end),
-    );
+  const matched = sourceRanges
+    ? sourceRanges
+        .filter(
+          (range) => range.end > start && range.start < start + raw.length,
+        )
+        .map((range) => ({
+          start: range.start - start,
+          end: range.end - start,
+        }))
+    : terms
+        .flatMap((term) =>
+          literalMatches(raw, term, { ...options, wholeWord: false }, 220),
+        )
+        .filter(
+          (range) =>
+            !options.wholeWord ||
+            wordBoundary(content, start + range.start, start + range.end),
+        );
   return {
     excerpt:
       prefix +
@@ -162,4 +178,8 @@ export function searchExcerpt(
       })),
     ],
   };
+}
+
+export function hasSearchQuery(query: string, options: SearchOptions) {
+  return options.regex ? query.length > 0 : !!query.trim();
 }

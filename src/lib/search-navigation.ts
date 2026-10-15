@@ -19,10 +19,31 @@ export function renderedSearchRange(root: HTMLElement, hit: SearchHit) {
         (Number(b.dataset.readerEnd) - Number(b.dataset.readerStart)),
     );
   for (const candidate of candidates) {
-    const index = readingText(candidate),
-      start = index.text.indexOf(needle),
-      end = start + needle.length;
-    if (start < 0) continue;
+    const index = readingText(candidate);
+    let start = index.text.indexOf(needle);
+    if (start < 0 || !needle.length) continue;
+    const context = hit.location.context;
+    if (context && index.text.indexOf(needle, start + needle.length) >= 0) {
+      const possible: number[] = [];
+      let count = 0;
+      for (
+        let at = start;
+        at >= 0;
+        at = index.text.indexOf(needle, at + needle.length)
+      ) {
+        if (++count > 1000) return;
+        const before = index.text.slice(Math.max(0, at - 32), at);
+        const after = index.text.slice(
+          at + needle.length,
+          at + needle.length + 32,
+        );
+        if (context.before.endsWith(before) && context.after.startsWith(after))
+          possible.push(at);
+      }
+      if (possible.length !== 1) continue;
+      start = possible[0];
+    }
+    const end = start + needle.length;
     const first = index.entries.find((entry) => entry.end > start),
       last = index.entries.find(
         (entry) => entry.end >= end && entry.start < end,
@@ -42,7 +63,23 @@ export function refreshSearchHit(
 ): SearchHit | null {
   if (hit.location) {
     const { offset, needle } = hit.location;
-    if (content.slice(offset, offset + needle.length) !== needle) return null;
+    if (
+      offset < 0 ||
+      offset > content.length ||
+      content.slice(offset, offset + needle.length) !== needle
+    )
+      return null;
+    const context = hit.location.context;
+    if (
+      context &&
+      (content.slice(Math.max(0, offset - context.before.length), offset) !==
+        context.before ||
+        content.slice(
+          offset + needle.length,
+          offset + needle.length + context.after.length,
+        ) !== context.after)
+    )
+      return null;
     return {
       ...hit,
       location: {

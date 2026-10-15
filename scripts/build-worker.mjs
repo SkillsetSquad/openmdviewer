@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 await build({
   entryPoints: {
+    "regex-worker": "src/workers/regex.worker.ts",
     "search-worker": "src/workers/search.worker.ts",
     "analysis-worker": "src/workers/analysis.worker.ts",
     "graph-worker": "src/workers/graph.worker.ts",
@@ -13,4 +14,4 @@ await build({
   target: "es2020",
   format: "iife",
 });
-console.log("Bundled local search, analysis, and graph workers.");
+console.log("Bundled local search, regex, analysis, and graph workers.");

@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "public/search-worker.js",
+    "public/regex-worker.js",
     "public/analysis-worker.js",
     "public/graph-worker.js",
   ]),

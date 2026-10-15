@@ -1,3 +1,4 @@
+import type { RegexDocument } from "./regex-search";
 import { filterSuggestions } from "./search-suggestions";
 import MiniSearch from "minisearch";
 import {
@@ -66,6 +67,26 @@ export class LocalSearch {
       else this.index.add(doc);
       this.documents.set(doc.id, doc);
     }
+  }
+  regexDocuments(): RegexDocument[] {
+    return [...this.documents.values()].map((doc) => {
+      const model = this.models.get(doc.id)!;
+      return {
+        id: doc.id,
+        path: doc.path,
+        title: doc.title,
+        content: doc.content,
+        tags: doc.tags,
+        status: doc.status,
+        metadata: doc.metadata,
+        bodyStart: doc.content.length - model.frontmatter.body.length,
+        headings: model.headings,
+        sourceBlocks: model.sourceBlocks.map(({ startOffset, endOffset }) => ({
+          startOffset,
+          endOffset,
+        })),
+      };
+    });
   }
   navigation() {
     return workspaceNavigation([...this.documents.values()], this.models);

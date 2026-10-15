@@ -4446,3 +4446,18 @@ kbd {
   color: var(--muted-foreground);
   font-size: 10px;
 }
+
+.regex-search-help {
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.regex-search-help button {
+  margin-top: 6px;
+  padding: 4px 7px;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}

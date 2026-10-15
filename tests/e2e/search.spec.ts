@@ -243,6 +243,38 @@ test("all result pages are reachable with exact counts and the final page opens 
   await expect(
     page.getByRole("navigation", { name: "Search result pages", exact: true }),
   ).toContainText("1–50 of 125 documents");
+  await dialog
+    .getByRole("combobox", { name: "Document matching" })
+    .selectOption("regex");
+  await dialog
+    .getByRole("combobox", {
+      name: "Search documents and commands",
+      exact: true,
+    })
+    .fill("pageM.rker");
+  await expect(options).toHaveCount(50);
+  await dialog
+    .getByRole("button", { name: "Next results", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("navigation", {
+      name: "Search result pages",
+      exact: true,
+    }),
+  ).toContainText("51–100 of 125 documents");
+  await dialog
+    .getByRole("button", { name: "Next results", exact: true })
+    .click();
+  await expect(options).toHaveCount(25);
+  await options.first().click();
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.toString()))
+    .toBe("pageMarker");
+  await page.getByRole("button", { name: "paging", exact: true }).click();
+  await expect(
+    dialog.getByRole("combobox", { name: "Document matching" }),
+  ).toHaveValue("fuzzy");
+  await expect(options).toHaveCount(50);
 });
 
 test("search history remembers explicit actions and restores options after reload without saving drafts", async ({
@@ -541,4 +573,189 @@ test("a history storage failure is reported without blocking a document result",
   await expect
     .poll(() => page.evaluate(() => window.getSelection()?.toString()))
     .toBe("resilientNeedle");
+});
+
+test("regex highlights actual contextual matches, selects the right repeated passage and restores its mode offline", async ({
+  page,
+  context,
+}) => {
+  const prose = "barfoo then xfoo and more.";
+  await load(page, [
+    {
+      name: "Regex.md",
+      content: `# Regex reference\n\n${prose}\n\nID-42 and ID-420.\n\n\`\`\`js\nconst secret77 = 1;\n\`\`\``,
+    },
+  ]);
+  let dialog = await search(page, "(?<=x)foo");
+  await dialog
+    .getByRole("combobox", { name: "Document matching" })
+    .selectOption("regex");
+  let result = dialog
+    .getByRole("group", { name: "Documents", exact: true })
+    .getByRole("option");
+  await expect(result).toHaveCount(1);
+  await expect(result.locator(".search-excerpt mark")).toHaveCount(1);
+  await expect(result.locator(".search-excerpt mark")).toHaveText("foo");
+  await result.click();
+  await expect(dialog).not.toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.getSelection()?.anchorOffset))
+    .toBe(prose.indexOf("xfoo") + 1);
+  await expect(
+    page.getByRole("button", { name: "Reading view", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  dialog = await search(page, "secret\\d+");
+  result = dialog
+    .getByRole("group", { name: "Documents", exact: true })
+    .getByRole("option");
+  await expect(result).toContainText("Line 8 · Source");
+  await result.click();
+  await expect(page.locator(".cm-activeLine")).toContainText(
+    "const secret77 = 1;",
+  );
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await expect
+    .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
+    .toBe(true);
+  await context.setOffline(true);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Regex reference", exact: true }),
+  ).toBeVisible();
+  dialog = await search(page, "(?<=ID-)42(?!0)");
+  await dialog
+    .getByRole("combobox", { name: "Document matching" })
+    .selectOption("regex");
+  await expect(
+    dialog
+      .getByRole("group", { name: "Documents", exact: true })
+      .getByRole("option")
+      .locator(".search-excerpt mark"),
+  ).toHaveText("42");
+  await dialog.locator(".recent-searches > summary").click();
+  await expect(
+    dialog.getByRole("button", {
+      name: "Restore search: (?<=x)foo (Regex)",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", {
+      name: "Restore search: (?<=x)foo (Regex)",
+      exact: true,
+    })
+    .click();
+  await expect(
+    dialog.getByRole("combobox", { name: "Document matching" }),
+  ).toHaveValue("regex");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (await new AxeBuilder({ page }).analyze()).violations.filter((v) =>
+      ["serious", "critical"].includes(v.impact || ""),
+    ),
+  ).toEqual([]);
+});
+
+test("invalid and zero-width regex patterns are explained and never fabricate selected text", async ({
+  page,
+}) => {
+  await load(page, [
+    {
+      name: "Zero.md",
+      content: "# Zero-width\n\nLocateHere remains unchanged.",
+    },
+  ]);
+  const dialog = await search(page, "[");
+  await dialog
+    .getByRole("combobox", { name: "Document matching" })
+    .selectOption("regex");
+  await expect(dialog.getByText(/^Invalid regular expression:/)).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Retry regex search", exact: true }),
+  ).toBeVisible();
+  const input = dialog.getByRole("combobox", {
+    name: "Search documents and commands",
+    exact: true,
+  });
+  await input.fill("(?=LocateHere)");
+  const result = dialog
+    .getByRole("group", { name: "Documents", exact: true })
+    .getByRole("option");
+  await expect(result).toContainText("Line 3 · Source · Zero-width match");
+  await expect(result.locator("mark")).toHaveCount(0);
+  await result.click();
+  await expect(page.locator(".cm-activeLine")).toContainText(
+    "LocateHere remains unchanged.",
+  );
+});
+
+test("expensive regex evaluations time out or cancel in their own worker while ordinary search and commands survive", async ({
+  page,
+}) => {
+  await load(page, [
+    {
+      name: "Danger.md",
+      content:
+        "# Expensive patterns\n\n" + "a".repeat(60000) + "!\n\nRecoveryNeedle",
+    },
+  ]);
+  const workers: string[] = [];
+  page.on("worker", (worker) => workers.push(worker.url()));
+  const dialog = await search(page, "(a+)+$");
+  const matching = dialog.getByRole("combobox", { name: "Document matching" });
+  await matching.selectOption("regex");
+  await expect(
+    dialog.getByText(
+      "Regular-expression search exceeded its 1.5-second limit. Simplify the pattern or switch matching.",
+      { exact: true },
+    ),
+  ).toBeVisible({ timeout: 10000 });
+  expect(workers.some((url) => url.endsWith("/regex-worker.js"))).toBe(true);
+  const next = page.waitForEvent("worker", (worker) =>
+    worker.url().endsWith("/regex-worker.js"),
+  );
+  await dialog
+    .getByRole("button", { name: "Retry regex search", exact: true })
+    .click();
+  const worker = await next;
+  const closed = worker.waitForEvent("close");
+  await dialog
+    .getByRole("button", { name: "Cancel regex search", exact: true })
+    .click();
+  await closed;
+  await expect(
+    dialog.getByText("Regular-expression search cancelled.", { exact: true }),
+  ).toBeVisible();
+  const input = dialog.getByRole("combobox", {
+    name: "Search documents and commands",
+    exact: true,
+  });
+  const superseded = page.waitForEvent("worker", (worker) =>
+    worker.url().endsWith("/regex-worker.js"),
+  );
+  await dialog
+    .getByRole("button", { name: "Retry regex search", exact: true })
+    .click();
+  const oldWorker = await superseded;
+  const oldClosed = oldWorker.waitForEvent("close");
+  await input.fill("RecoveryNeedle");
+  await oldClosed;
+  await expect(
+    dialog
+      .getByRole("group", { name: "Documents", exact: true })
+      .getByRole("option"),
+  ).toHaveCount(1);
+  await matching.selectOption("fuzzy");
+  await expect(
+    dialog
+      .getByRole("group", { name: "Documents", exact: true })
+      .getByRole("option"),
+  ).toHaveCount(1);
+  await input.fill("> settings");
+  await dialog
+    .getByRole("option", { name: "Reading settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Make yourself at home", exact: true }),
+  ).toBeVisible();
 });
