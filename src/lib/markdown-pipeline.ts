@@ -198,7 +198,11 @@ export function rehypeRepairAnchors() {
           const target = decodeURIComponent(node.properties.href.slice(1));
           if (aliases[target]) {
             node.properties.href = `#${encodeURIComponent(aliases[target])}`;
-            node.data = { ...node.data, readerAnchorRepaired: true };
+            node.data = {
+              ...node.data,
+              position: node.data?.position || {},
+              readerAnchorRepaired: true,
+            };
           }
         } catch {}
       }
@@ -231,7 +235,11 @@ export function rehypeHeadingAliases() {
           const target = decodeURIComponent(node.properties.href.slice(1));
           if (aliases[target]) {
             node.properties.href = `#${encodeURIComponent(aliases[target])}`;
-            node.data = { ...node.data, readerAnchorRepaired: true };
+            node.data = {
+              ...node.data,
+              position: node.data?.position || {},
+              readerAnchorRepaired: true,
+            };
           }
         } catch {}
       }

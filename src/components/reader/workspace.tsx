@@ -79,7 +79,12 @@ import {
   workspaceMetadataPath,
   workspaceMetadata,
 } from "@/lib/workspace-archive";
-import { readLocalFiles, isolateImport } from "@/lib/import";
+import {
+  convertibleFile,
+  type ConversionInput,
+  type ConversionResult,
+} from "@/lib/conversion-types";
+import { readLocalFiles, isolateImport, sourceAssetType } from "@/lib/import";
 import { storage } from "@/lib/storage";
 import {
   documentTags,
@@ -98,6 +103,7 @@ import type {
   ReaderAnnotation,
   TextQuote,
 } from "@/lib/types";
+const ConversionDialog = lazy(() => import("./conversion-dialog"));
 const LocalDirectoryDialog = lazy(() => import("./local-directory-dialog"));
 const LocalFileDialog = lazy(() => import("./local-file-dialog"));
 const Annotations = lazy(() => import("./annotations"));
@@ -112,6 +118,7 @@ type DialogName =
   | "new"
   | "rename"
   | "export"
+  | "convertImport"
   | "localDirectory"
   | "localFile"
   | "tags"
@@ -183,6 +190,11 @@ export default function Workspace() {
     resolvingConflict,
   } = session;
   const [dialog, setDialog] = useState<DialogName>(null);
+  const [conversionRequest, setConversionRequest] = useState<{
+    id: string;
+    inputs: ConversionInput[];
+    workspaceId: string;
+  } | null>(null);
   const localFileBusy = useRef(false);
   const setLocalFileBusy = useCallback((value: boolean) => {
     localFileBusy.current = value;
@@ -625,43 +637,63 @@ export default function Workspace() {
     },
     [openDocument, notify, assetURLs],
   );
+  async function persistImport(
+    imported: Pick<ConversionResult, "documents" | "assets">,
+    targetWorkspaceId: string,
+  ) {
+    const additions = imported.documents;
+    if (!additions.length && !imported.assets.length) {
+      notify(
+        "Choose Markdown, text, media, HTML, DOCX, or a ZIP containing supported files.",
+      );
+      return;
+    }
+    const existingDocuments = await storage.load(targetWorkspaceId);
+    isolateImport(
+      additions,
+      imported.assets,
+      new Set([
+        ...existingDocuments.map((d) => d.path),
+        ...(await storage.loadAssets(targetWorkspaceId)).map((a) => a.path),
+      ]),
+    );
+    if (additions.length + existingDocuments.length > 10000)
+      throw new Error("This workspace supports up to 10,000 documents.");
+    for (const added of additions) {
+      added.workspaceId = targetWorkspaceId;
+      added.revision = 0;
+    }
+    await storage.import(additions, imported.assets, targetWorkspaceId);
+    await refreshAssets(targetWorkspaceId);
+    if (useReader.getState().workspaceId !== targetWorkspaceId) {
+      notify(
+        "Import completed in the previous workspace. Switch back to view it.",
+      );
+      return;
+    }
+    setDocuments([...useReader.getState().documents, ...additions]);
+    if (additions[0]) openDocument(additions[0].id);
+    notify(
+      `Imported ${additions.length} documents and ${imported.assets.length} ${imported.assets.some((asset) => sourceAssetType(asset.path)) ? "assets (including originals)" : "media files"}. Kept on this device.`,
+    );
+  }
   async function importFiles(files: File[]) {
+    if (!files.length) return;
+    if (files.some((file) => convertibleFile(file.name))) {
+      setConversionRequest({
+        id: crypto.randomUUID(),
+        workspaceId,
+        inputs: files.map((file) => ({
+          file,
+          path: file.webkitRelativePath || `Imported/${file.name}`,
+        })),
+      });
+      setDialog("convertImport");
+      return;
+    }
     flushEdit();
     try {
-      const imported = await readLocalFiles(files);
-      const additions = imported.documents;
-      if (!additions.length && !imported.assets.length) {
-        notify("Choose Markdown, text, media files, or a ZIP containing them.");
-        return;
-      }
-      const existingDocuments = await storage.load(workspaceId);
-      isolateImport(
-        additions,
-        imported.assets,
-        new Set([
-          ...existingDocuments.map((d) => d.path),
-          ...(await storage.loadAssets(workspaceId)).map((a) => a.path),
-        ]),
-      );
-      if (additions.length + existingDocuments.length > 10000)
-        throw new Error("This workspace supports up to 10,000 documents.");
-      for (const added of additions) {
-        added.workspaceId = workspaceId;
-        added.revision = 0;
-      }
-      await storage.import(additions, imported.assets, workspaceId);
-      await refreshAssets();
-      if (useReader.getState().workspaceId !== workspaceId) {
-        notify(
-          "Import completed in the previous workspace. Switch back to view it.",
-        );
-        return;
-      }
-      setDocuments([...useReader.getState().documents, ...additions]);
-      if (additions[0]) openDocument(additions[0].id);
-      notify(
-        `Imported ${additions.length} documents and ${imported.assets.length} media files. Kept on this device.`,
-      );
+      await persistImport(await readLocalFiles(files), workspaceId);
     } catch (error) {
       notify(
         `Import failed: ${error instanceof Error ? error.message : "Browser storage unavailable"}`,
@@ -948,6 +980,10 @@ export default function Workspace() {
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
+        if (document.querySelector("dialog[open]")) {
+          notify("Close the current dialog before importing more files.");
+          return;
+        }
         void importFiles(Array.from(e.dataTransfer.files));
       }}
     >
@@ -960,7 +996,7 @@ export default function Workspace() {
         type="file"
         aria-label="Import Markdown files"
         multiple
-        accept=".md,.markdown,.mdown,.mkd,.mdx,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.avif,.pdf,.mp3,.wav,.mp4,.webm,.ogg,.m4a,.aac,.flac,.opus,.ogv,.vtt"
+        accept=".html,.htm,.docx,.md,.markdown,.mdown,.mkd,.mdx,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.avif,.pdf,.mp3,.wav,.mp4,.webm,.ogg,.m4a,.aac,.flac,.opus,.ogv,.vtt"
         ref={filesRef}
         onChange={fileInput}
       />
@@ -2051,6 +2087,43 @@ export default function Workspace() {
           />
         </Suspense>
       )}
+      {dialog === "convertImport" && conversionRequest && (
+        <Suspense
+          fallback={
+            <Modal
+              title="Convert documents"
+              onClose={() => {
+                setDialog(null);
+                setConversionRequest(null);
+              }}
+            >
+              <p role="status">Loading local converters…</p>
+            </Modal>
+          }
+        >
+          <ConversionDialog
+            key={conversionRequest.id}
+            onBusy={setLocalFileBusy}
+            inputs={conversionRequest.inputs}
+            workspaceName={
+              workspaces.find(
+                (item) => item.id === conversionRequest.workspaceId,
+              )?.name || "the selected workspace"
+            }
+            onClose={() => {
+              setDialog(null);
+              setConversionRequest(null);
+            }}
+            onApply={async (result) => {
+              if (!(await flushEdit()))
+                throw new Error(
+                  "Resolve pending browser saves before importing.",
+                );
+              await persistImport(result, conversionRequest.workspaceId);
+            }}
+          />
+        </Suspense>
+      )}
       {dialog === "localDirectory" && (
         <Suspense
           fallback={
@@ -2670,9 +2743,9 @@ export default function Workspace() {
             </p>
           </div>
           <p className="dialog-description">
-            Drop Markdown files anywhere, or use Open files to import a ZIP. Use
-            Open folder to preserve folder structure. Export regularly: browser
-            data can be cleared by you or the browser.
+            Drop Markdown, HTML, or DOCX files anywhere, or use Open files to
+            import a ZIP. Use Open folder to preserve folder structure. Export
+            regularly: browser data can be cleared by you or the browser.
           </p>
           <a
             className="github-link"

@@ -109,8 +109,9 @@ export const Markdown = memo(function Markdown({
     pre: PreRenderer,
     span: SpanRenderer,
     code: CodeRenderer,
-    a: ({ href, children }) => (
+    a: ({ href, id, children }) => (
       <a
+        id={id}
         href={href}
         onClick={(e) => {
           if (href && !/^https?:|^mailto:|^tel:|^\/\//i.test(href)) {

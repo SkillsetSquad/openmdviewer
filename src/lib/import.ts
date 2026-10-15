@@ -27,6 +27,11 @@ const mediaTypes: Record<string, string> = {
 };
 export const mediaType = (name: string) =>
   mediaTypes[name.split(".").pop()?.toLowerCase() || ""];
+// Source attachments must download as bytes rather than becoming executable same-origin HTML blobs.
+export const sourceAssetType = (name: string) =>
+  /\.(html?|docx)$/i.test(name) ? "application/octet-stream" : "";
+export const attachmentType = (name: string) =>
+  mediaType(name) || sourceAssetType(name);
 export function isolateImport(
   documents: ReaderDocument[],
   assets: ReaderAsset[],
@@ -43,7 +48,7 @@ export function isolateImport(
   );
   for (const item of [...documents, ...assets]) item.path = prefix + item.path;
 }
-export async function readLocalFiles(files: File[]) {
+export async function readLocalFiles(files: File[], paths?: string[]) {
   const documents: ReaderDocument[] = [];
   const assets: ReaderAsset[] = [];
   let total = 0;
@@ -57,14 +62,14 @@ export async function readLocalFiles(files: File[]) {
       documents.push(
         newDocument(safePath(path), new TextDecoder().decode(bytes)),
       );
-    else if (mediaType(path))
+    else if (attachmentType(path))
       assets.push({
         path: safePath(path),
-        blob: new Blob([bytes as BlobPart], { type: mediaType(path) }),
-        type: mediaType(path),
+        blob: new Blob([bytes as BlobPart], { type: attachmentType(path) }),
+        type: attachmentType(path),
       });
   };
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
     if (file.size > 30 * 1024 * 1024)
       throw new Error(`${file.name} exceeds the 30 MB per-file import limit.`);
     if (/\.zip$/i.test(file.name)) {
@@ -74,7 +79,7 @@ export async function readLocalFiles(files: File[]) {
         filter: (entry) => {
           if (
             !supportedFile(entry.name) &&
-            !mediaType(entry.name) &&
+            !attachmentType(entry.name) &&
             entry.name !== workspaceMetadataPath
           )
             return false;
@@ -94,9 +99,9 @@ export async function readLocalFiles(files: File[]) {
           documents.slice(first),
           new TextDecoder().decode(content[workspaceMetadataPath]),
         );
-    } else if (supportedFile(file.name) || mediaType(file.name))
+    } else if (supportedFile(file.name) || attachmentType(file.name))
       add(
-        file.webkitRelativePath || `Imported/${file.name}`,
+        paths?.[index] || file.webkitRelativePath || `Imported/${file.name}`,
         new Uint8Array(await file.arrayBuffer()),
       );
   }

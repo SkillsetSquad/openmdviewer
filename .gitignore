@@ -50,3 +50,5 @@ next-env.d.ts
 /public/graph-worker.js
 
 /public/regex-worker.js
+
+/public/conversion-worker.js
