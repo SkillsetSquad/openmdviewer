@@ -3938,3 +3938,124 @@ kbd {
     box-shadow: none;
   }
 }
+
+/* Diagram view controls affect presentation only, never Mermaid source. */
+.enhanced-diagram .diagram-toolbar {
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px 10px;
+}
+.enhanced-diagram .diagram-toolbar > div {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.enhanced-diagram .diagram-toolbar button {
+  min-width: 26px;
+  min-height: 26px;
+  justify-content: center;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.diagram-zoom {
+  min-width: 38px;
+  text-align: center;
+}
+.enhanced-diagram .diagram-canvas {
+  position: relative;
+  min-height: 140px;
+  max-height: 65dvh;
+  overflow: hidden;
+  padding: 20px;
+  touch-action: none;
+  cursor: grab;
+}
+.enhanced-diagram .diagram-canvas:active {
+  cursor: grabbing;
+}
+.enhanced-diagram.diagram-dark .diagram-canvas {
+  background: #171d25;
+  color: #e7ebf2;
+}
+.enhanced-diagram.diagram-light .diagram-canvas {
+  background: #eef1f5;
+  color: #17212d;
+}
+.diagram-art {
+  transform-origin: center;
+  width: 100%;
+  user-select: none;
+}
+.diagram-art svg {
+  display: block;
+  width: 100%;
+  max-height: 55dvh;
+  height: auto;
+  margin: auto;
+}
+.diagram-feedback,
+.diagram-error {
+  margin: 0 !important;
+  padding: 8px 12px;
+  font: 11px/1.7 var(--font-geist-sans);
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.diagram-feedback:empty {
+  display: none;
+}
+.diagram-error {
+  border-top: 1px solid var(--border);
+}
+.diagram-source {
+  margin: 0 !important;
+  max-height: 65dvh;
+  white-space: pre-wrap;
+}
+.app-dialog.expanded-diagram {
+  width: calc(100vw - 32px);
+  max-width: none;
+  height: calc(100dvh - 32px);
+  max-height: none;
+}
+.expanded-diagram .diagram-canvas {
+  height: calc(100dvh - 180px);
+  max-height: none;
+}
+.expanded-diagram .diagram-art svg {
+  max-height: calc(100dvh - 220px);
+}
+.expanded-diagram .diagram-source {
+  max-height: calc(100dvh - 180px);
+}
+@media print {
+  .enhanced-diagram .diagram-toolbar,
+  .diagram-feedback {
+    display: none !important;
+  }
+  .enhanced-diagram .diagram-canvas {
+    max-height: none;
+    overflow: visible;
+  }
+  .diagram-art {
+    transform: none !important;
+  }
+  .diagram-art svg {
+    max-height: none;
+  }
+}
+.diagram-fullscreen-surface:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+}
+
+.diagram-fullscreen-surface:fullscreen {
+  background: var(--app-bg);
+  overflow: auto;
+}
+.diagram-fullscreen-surface:fullscreen .diagram-canvas {
+  height: calc(100dvh - 100px);
+}

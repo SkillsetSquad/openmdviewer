@@ -1,0 +1,15 @@
+# Mermaid diagrams
+
+Fenced `mermaid` blocks render locally, with lazy, self-hosted Mermaid modules. The viewer supports zoom, pointer dragging, keyboard pan (arrows), zoom keys (`+`/`-`), fit/reset (`0`), source/rendered view, and an expanded viewport with native fullscreen when the browser supports it. Escape closes expanded view and returns focus to its opener. Reading controls do not change the source document.
+
+Copy or download the Mermaid source (`.mmd`), download the sanitized full diagram as SVG, or export a PNG with a theme-appropriate background. Exports include the whole diagram regardless of viewport pan/zoom. PNG rendering preserves aspect ratio, uses up to 2× resolution, and caps the raster at 4,096 pixels per side and 16 million pixels. The export status reports the actual encoded canvas dimensions. Temporary object URLs are revoked after use.
+
+Diagrams follow light/dark/system reading themes. Render jobs are serialized so one diagram's initialization cannot change another in-flight diagram's theme or security configuration. Source/theme changes hide stale output while a new render is pending; failed renders retain readable, copyable source and disable image exports.
+
+## Untrusted diagram source
+
+Mermaid runs with strict security, SVG text labels, protected application configuration, a 50,000-character source limit, and a 500-edge limit. The rendered SVG passes through DOMPurify and a separate resource/style filter before display or export. Script, links, embedded images, animation, HTML foreign objects, external references, and unscoped or resource-bearing CSS are removed. Styling is restricted to local SVG appearance properties and diagram-scoped selectors. Raster export uses the same sanitized SVG, resized before image decoding to bound the requested raster.
+
+URL-bearing or active-resource source is rejected **before Mermaid renders**, because its temporary rendering DOM could otherwise make network requests. This conservative rule also rejects URL labels, embedded image/icon syntax, CSS URL references, and encoded forms of those resources. Source remains available for inspection/copy/download. This release does not offer remote-resource consent inside Mermaid; ordinary Markdown media has its own separate consent controls. SVG text labels are used instead of embedded HTML to keep rendering and PNG export local and inert.
+
+The reader supports Mermaid's installed diagram formats. Browser tests exercise basic flowchart, sequence, class, state, entity relationship, Gantt, pie, Git graph, timeline, mind map, journey, and quadrant diagrams, actual drag/keyboard navigation, expanded view/focus, source copying, SVG contents, PNG dimensions and non-background pixels, syntax errors, stale-output removal, mobile layout, accessibility checks, offline rendering, and blocked external-resource requests. Other diagram formats, browsers, and assistive technologies still need broader certification; availability is not a claim of exhaustive compatibility testing.
