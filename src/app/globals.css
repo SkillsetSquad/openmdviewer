@@ -4768,3 +4768,25 @@ kbd {
 .pdf-password-form p {
   overflow-wrap: anywhere;
 }
+
+.site-export-dialog p,
+.site-export-summary li {
+  overflow-wrap: anywhere;
+}
+.site-export-summary ul {
+  max-height: 200px;
+  overflow: auto;
+  padding-left: 20px;
+}
+.site-export-dialog .dialog-buttons {
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .site-export-dialog .dialog-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .site-export-dialog .dialog-buttons button {
+    width: 100%;
+  }
+}

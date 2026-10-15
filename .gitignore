@@ -52,6 +52,7 @@ next-env.d.ts
 /public/regex-worker.js
 
 /public/conversion-worker.js
+/public/site-worker.js
 
 /public/pdf-worker.js
 /public/pdf-assets/

@@ -49,6 +49,11 @@ export const commands = [
     quick: true,
   },
   {
+    id: "exportSite",
+    label: "Export documentation website",
+    keywords: "publish static html site download navigation search",
+  },
+  {
     id: "workspaces",
     label: "Manage workspaces",
     keywords: "open switch workspace name description",

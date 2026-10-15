@@ -104,6 +104,7 @@ import type {
   TextQuote,
 } from "@/lib/types";
 const ConversionDialog = lazy(() => import("./conversion-dialog"));
+const SiteExportDialog = lazy(() => import("./site-export-dialog"));
 const LocalDirectoryDialog = lazy(() => import("./local-directory-dialog"));
 const LocalFileDialog = lazy(() => import("./local-file-dialog"));
 const Annotations = lazy(() => import("./annotations"));
@@ -118,6 +119,7 @@ type DialogName =
   | "new"
   | "rename"
   | "export"
+  | "exportSite"
   | "convertImport"
   | "localDirectory"
   | "localFile"
@@ -787,6 +789,9 @@ export default function Workspace() {
           break;
         case "exportZip":
           await exportZip();
+          break;
+        case "exportSite":
+          setDialog("exportSite");
           break;
         case "read":
           if (doc) setMode("read");
@@ -2091,6 +2096,49 @@ export default function Workspace() {
           />
         </Suspense>
       )}
+      {dialog === "exportSite" && (
+        <Suspense
+          fallback={
+            <Modal
+              title="Export documentation website"
+              onClose={() => setDialog(null)}
+            >
+              <p role="status">Loading website exporter…</p>
+            </Modal>
+          }
+        >
+          <SiteExportDialog
+            workspaceName={
+              workspaces.find((item) => item.id === workspaceId)?.name ||
+              "this workspace"
+            }
+            onBusy={setLocalFileBusy}
+            onClose={() => setDialog(null)}
+            snapshot={async () => {
+              if (!(await flushEdit()))
+                throw new Error(
+                  "Resolve pending browser saves before exporting.",
+                );
+              const state = useReader.getState();
+              if (state.workspaceId !== workspaceId)
+                throw new Error("The workspace changed. Reopen the exporter.");
+              const workspace = workspaces.find(
+                (item) => item.id === workspaceId,
+              );
+              const documents = state.documents.map(
+                ({ id, path, content }) => ({ id, path, content }),
+              );
+              const assets = await storage.loadAssets(workspaceId);
+              return {
+                title: workspace?.name || "Documentation",
+                description: workspace?.description || "",
+                documents,
+                assets: assets.map(({ path, blob }) => ({ path, blob })),
+              };
+            }}
+          />
+        </Suspense>
+      )}
       {dialog === "convertImport" && conversionRequest && (
         <Suspense
           fallback={
@@ -2501,6 +2549,14 @@ export default function Workspace() {
               <span>
                 <strong>Print / Save as PDF</strong>
                 <small>A clean layout, without the interface</small>
+              </span>
+              <ArrowDownToLine size={16} />
+            </button>
+            <button onClick={() => setDialog("exportSite")}>
+              <BookOpen />
+              <span>
+                <strong>Documentation website</strong>
+                <small>Linked pages, search and local assets</small>
               </span>
               <ArrowDownToLine size={16} />
             </button>

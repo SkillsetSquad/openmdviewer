@@ -53,6 +53,7 @@ const icons = {
   settings: Settings2,
   focus: Maximize2,
   exportZip: ArrowDownToLine,
+  exportSite: BookOpen,
   workspaces: FolderOpen,
   theme: Moon,
   health: ShieldCheck,

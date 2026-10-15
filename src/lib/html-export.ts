@@ -9,6 +9,7 @@ import rehypeStringify from "rehype-stringify";
 import rehypeSlug from "rehype-slug";
 import { visit, SKIP } from "unist-util-visit";
 import type { Root } from "hast";
+import { VFile } from "vfile";
 import { frontmatter } from "./frontmatter";
 import {
   markdownSchema,
@@ -96,28 +97,30 @@ function exportPresentation() {
     });
   };
 }
+export async function exportHTMLTree(content: string): Promise<Root> {
+  const file = new VFile({ value: frontmatter(content).body });
+  const processor = unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkMath)
+    .use(remarkDefinitionList)
+    .use(remarkReaderExtensions)
+    .use(remarkReaderEmoji)
+    .use(remarkRehype, {
+      allowDangerousHtml: true,
+      handlers: defListHastHandlers,
+    })
+    .use(rehypeRaw)
+    .use(rehypeRememberAnchors)
+    .use(rehypeSanitize, markdownSchema)
+    .use(rehypeCalloutLabels)
+    .use(rehypeRepairAnchors)
+    .use(rehypeSlug, { prefix: "user-content-" })
+    .use(rehypeHeadingAliases);
+  return (await processor.run(processor.parse(file), file)) as Root;
+}
 export async function exportHTMLBody(content: string) {
-  return String(
-    await unified()
-      .use(remarkParse)
-      .use(remarkGfm)
-      .use(remarkMath)
-      .use(remarkDefinitionList)
-      .use(remarkReaderExtensions)
-      .use(remarkReaderEmoji)
-      .use(remarkRehype, {
-        allowDangerousHtml: true,
-        handlers: defListHastHandlers,
-      })
-      .use(rehypeRaw)
-      .use(rehypeRememberAnchors)
-      .use(rehypeSanitize, markdownSchema)
-      .use(rehypeCalloutLabels)
-      .use(rehypeRepairAnchors)
-      .use(rehypeSlug, { prefix: "user-content-" })
-      .use(rehypeHeadingAliases)
-      .use(exportPresentation)
-      .use(rehypeStringify)
-      .process(frontmatter(content).body),
-  );
+  const tree = await exportHTMLTree(content);
+  exportPresentation()(tree);
+  return String(unified().use(rehypeStringify).stringify(tree));
 }

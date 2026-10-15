@@ -12,6 +12,7 @@
 - No API routes, Server Actions, application server, accounts, database server, telemetry, or document uploads.
 - Read/process/store documents in the browser. IndexedDB for document data; localStorage only for small preferences.
 - Imported Markdown/MDX is untrusted. Sanitize HTML, disallow executable MDX, keep remote media blocked until explicit consent, and use Mermaid strict security.
+- Website exports must be generated in a bounded, cancellable browser worker. Sanitize document HTML, rewrite workspace links to actual generated pages/anchors, include only referenced local assets, keep remote media inert, exclude browser-private reading data and handles, and provide a review report before download. Generated sites must work on static root/subpath hosts without the reader runtime.
 - PDF import must use bounded, cancellable text-layer extraction with explicit no-text notices. Keep passwords ephemeral, source PDFs unchanged and binary, and all parser/font/CMap assets self-hosted. Preserve Markdown-bundle PDF attachments; never imply OCR or source page-layout reconstruction.
 - Convert HTML/DOCX in a cancellable isolated worker; never insert source HTML into a browser document. Measure actual expanded DOCX parts before parsing, block external file access, sanitize derived HTML, and preserve originals separately from Markdown. Require preview approval before atomic browser import.
 - Keep expensive optional rendering lazy. Preserve local files; browser autosave must never imply disk writes.

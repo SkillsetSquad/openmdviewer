@@ -40,7 +40,7 @@ test("fuzzy commands support virtual keyboard focus, wrapping, Enter, and Escape
     page
       .getByRole("listbox", { name: "Documents and commands" })
       .getByRole("option"),
-  ).toHaveCount(25);
+  ).toHaveCount(26);
   await expect(page.locator(".search-result")).toHaveCount(0);
   await expect(
     page.getByRole("option", { name: "Open files", exact: true }),
