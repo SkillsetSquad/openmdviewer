@@ -221,6 +221,9 @@ test("sanitizing an active title retains a named disclosure without executing im
         "# Safe title\n\n> [!WARNING]- <script>window.__calloutExecuted=true</script>\n> The safe body remains available.",
       ),
     });
+  await expect(
+    page.getByRole("heading", { name: "Safe title", exact: true }),
+  ).toBeVisible();
   const summary = page.locator("article summary");
   await expect(summary).toHaveAccessibleName("WARNING");
   await expect(summary).toBeVisible();
@@ -244,9 +247,11 @@ test("a passage selection spanning a closed callout cannot capture unseen body t
     selection?.removeAllRanges();
     selection?.addRange(range);
   });
-  expect(
-    await page.evaluate(() => window.getSelection()?.toString()),
-  ).not.toContain("Deep searchable passage");
+  const outer = page.locator("article details.callout-fold").first();
+  await expect(outer).not.toHaveAttribute("open");
+  await expect(
+    page.locator("article p").filter({ hasText: "Deep searchable passage" }),
+  ).toBeHidden();
   await page
     .getByRole("button", { name: "Notes and bookmarks", exact: true })
     .first()
