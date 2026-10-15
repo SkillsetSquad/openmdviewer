@@ -1,5 +1,6 @@
 import MiniSearch from "minisearch";
-import { markdownModel } from "./markdown-model";
+import { markdownModel, type MarkdownModel } from "./markdown-model";
+import { workspaceNavigation } from "./references";
 import { metadataString, metadataTags } from "./frontmatter";
 export interface SearchDocument {
   id: string;
@@ -26,13 +27,16 @@ export class LocalSearch {
     },
   });
   private documents = new Map<string, IndexedDocument>();
+  private models = new Map<string, MarkdownModel>();
   sync(changes: SearchDocument[], removed: string[]) {
     for (const id of removed) {
       if (this.documents.has(id)) this.index.discard(id);
       this.documents.delete(id);
+      this.models.delete(id);
     }
     for (const source of changes) {
       const model = markdownModel(source.content);
+      this.models.set(source.id, model);
       const meta = model.frontmatter.metadata;
       const doc: IndexedDocument = {
         ...source,
@@ -51,6 +55,9 @@ export class LocalSearch {
       else this.index.add(doc);
       this.documents.set(doc.id, doc);
     }
+  }
+  navigation() {
+    return workspaceNavigation([...this.documents.values()], this.models);
   }
   search(query: string): string[] {
     const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];

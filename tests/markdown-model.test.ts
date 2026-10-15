@@ -134,3 +134,22 @@ it("indexes frontmatter fields and status/type filters without mutating local ta
   ).toEqual(["meta"]);
   expect(source.tags).toEqual([]);
 });
+
+it("builds deduplicated cross-document edges and updates them incrementally", () => {
+  const search = new LocalSearch();
+  search.sync(
+    [
+      { id: "a", path: "A.md", content: "# A\n[B](B.md)\n[[B]]", tags: [] },
+      { id: "b", path: "B.md", content: "# B", tags: [] },
+    ],
+    [],
+  );
+  expect(search.navigation().edges).toEqual([
+    { from: "a", to: "b", count: 2, line: 2 },
+  ]);
+  search.sync(
+    [{ id: "a", path: "A.md", content: "# A\nNo links.", tags: [] }],
+    [],
+  );
+  expect(search.navigation().edges).toEqual([]);
+});

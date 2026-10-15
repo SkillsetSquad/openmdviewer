@@ -7,12 +7,22 @@ self.onmessage = (
     removed?: string[];
     query?: string;
     request?: number;
+    indexVersion?: number;
   }>,
 ) => {
   try {
-    if (event.data.type === "sync")
+    if (event.data.type === "sync") {
+      self.postMessage({
+        type: "indexing",
+        indexVersion: event.data.indexVersion,
+      });
       search.sync(event.data.changes || [], event.data.removed || []);
-    else
+      self.postMessage({
+        type: "navigation",
+        indexVersion: event.data.indexVersion,
+        navigation: search.navigation(),
+      });
+    } else
       self.postMessage({
         request: event.data.request,
         ids: search.search(event.data.query || ""),

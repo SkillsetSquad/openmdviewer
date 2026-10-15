@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { basePath } from "@/lib/types";
+import type { WorkspaceNavigation } from "@/lib/references";
 import type { ReaderDocument } from "@/lib/types";
 export function useLocalSearch(documents: ReaderDocument[], query: string) {
   const worker = useRef<Worker | null>(null);
@@ -8,6 +9,12 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
     new Map<string, { path: string; content: string; tags: string }>(),
   );
   const sequence = useRef(0);
+  const indexVersion = useRef(0);
+  const [navigation, setNavigation] = useState<WorkspaceNavigation>({
+    edges: [],
+    summaries: [],
+  });
+  const [indexing, setIndexing] = useState(false);
   const [result, setResult] = useState<{ query: string; ids: string[] } | null>(
     null,
   );
@@ -21,6 +28,17 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
     instance.onmessage = (event) => {
       if (event.data.error) {
         setFailed(true);
+        return;
+      }
+      if (event.data.type === "indexing") {
+        if (event.data.indexVersion === indexVersion.current) setIndexing(true);
+        return;
+      }
+      if (event.data.type === "navigation") {
+        if (event.data.indexVersion === indexVersion.current) {
+          setNavigation(event.data.navigation);
+          setIndexing(false);
+        }
         return;
       }
       if (event.data.request === sequence.current)
@@ -57,7 +75,12 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
       });
     removed.forEach((id) => versions.current.delete(id));
     if (changes.length || removed.length)
-      worker.current?.postMessage({ type: "sync", changes, removed });
+      worker.current?.postMessage({
+        type: "sync",
+        changes,
+        removed,
+        indexVersion: ++indexVersion.current,
+      });
     currentQuery.current = query;
     worker.current?.postMessage({
       type: "search",
@@ -65,5 +88,10 @@ export function useLocalSearch(documents: ReaderDocument[], query: string) {
       request: ++sequence.current,
     });
   }, [documents, query]);
-  return { ids: result?.query === query ? result.ids : null, failed };
+  return {
+    ids: result?.query === query ? result.ids : null,
+    failed,
+    navigation,
+    indexing,
+  };
 }

@@ -1,5 +1,5 @@
 "use client";
-import { resolveDocumentLink, documentBacklinks } from "@/lib/references";
+import { resolveDocumentLink } from "@/lib/references";
 import {
   lazy,
   Suspense,
@@ -66,7 +66,6 @@ import { readLocalFiles, isolateImport } from "@/lib/import";
 import { storage } from "@/lib/storage";
 import {
   analyze,
-  documentTitle,
   documentTags,
   download,
   fileName,
@@ -431,26 +430,12 @@ export default function Workspace() {
     selection?.addRange(range);
     node.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
-  const filtered = useMemo(
-    () =>
-      documents
-        .filter(
-          (d) =>
-            (collection !== "favorites" || d.favorite) &&
-            (!fileFilter ||
-              `${d.path} ${documentTags(d).join(" ")}`
-                .toLowerCase()
-                .includes(fileFilter.toLowerCase())),
-        )
-        .sort((a, b) =>
-          collection === "recent" ? b.updatedAt - a.updatedAt : 0,
-        ),
-    [documents, collection, fileFilter],
-  );
-  const { ids: searchIds, failed: searchFailed } = useLocalSearch(
-    documents,
-    query,
-  );
+  const {
+    ids: searchIds,
+    failed: searchFailed,
+    navigation,
+    indexing,
+  } = useLocalSearch(documents, query);
   const searching = !!query.trim() && searchIds === null && !searchFailed;
   const results = useMemo(
     () =>
@@ -463,9 +448,40 @@ export default function Workspace() {
           : documents.slice(0, 40),
     [documents, query, searchIds],
   );
+  const documentSummaries = useMemo(
+    () =>
+      Object.fromEntries(
+        navigation.summaries.map((summary) => [summary.id, summary]),
+      ),
+    [navigation],
+  );
+  const navigationReady = !doc || !!documentSummaries[doc.id];
   const backlinks = useMemo(
-    () => (doc ? documentBacklinks(doc, documents) : []),
-    [doc, documents],
+    () =>
+      doc
+        ? documents.filter((d) =>
+            navigation.edges.some(
+              (edge) => edge.from === d.id && edge.to === doc.id,
+            ),
+          )
+        : [],
+    [doc, documents, navigation],
+  );
+  const filtered = useMemo(
+    () =>
+      documents
+        .filter(
+          (d) =>
+            (collection !== "favorites" || d.favorite) &&
+            (!fileFilter ||
+              `${d.path} ${(documentSummaries[d.id]?.tags || d.tags).join(" ")}`
+                .toLowerCase()
+                .includes(fileFilter.toLowerCase())),
+        )
+        .sort((a, b) =>
+          collection === "recent" ? b.updatedAt - a.updatedAt : 0,
+        ),
+    [documents, collection, fileFilter, documentSummaries],
   );
   function resize(side: "left" | "right", e: React.PointerEvent) {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -1105,7 +1121,8 @@ export default function Workspace() {
                   className={panel === "backlinks" ? "active" : ""}
                   onClick={() => setPanel("backlinks")}
                 >
-                  Backlinks <small>{backlinks.length}</small>
+                  Backlinks{" "}
+                  <small>{navigationReady ? backlinks.length : "…"}</small>
                 </button>
                 <button
                   role="tab"
@@ -1141,7 +1158,9 @@ export default function Workspace() {
               )}
               {panel === "backlinks" && (
                 <div className="backlinks-panel">
-                  {backlinks.length ? (
+                  {!navigationReady || indexing ? (
+                    <p className="empty-panel">Indexing local links…</p>
+                  ) : backlinks.length ? (
                     backlinks.map((d) => (
                       <button key={d.id} onClick={() => openDocument(d.id)}>
                         <Link2 size={14} />
@@ -1454,7 +1473,9 @@ export default function Workspace() {
                       <FileText size={16} />
                       <span>
                         {fileName(d.path)}
-                        <small>{documentTitle(d)}</small>
+                        <small>
+                          {documentSummaries[d.id]?.title || fileName(d.path)}
+                        </small>
                       </span>
                     </button>
                   ))}
@@ -1591,7 +1612,9 @@ export default function Workspace() {
               >
                 <FileText size={18} />
                 <span>
-                  <strong>{documentTitle(d)}</strong>
+                  <strong>
+                    {documentSummaries[d.id]?.title || fileName(d.path)}
+                  </strong>
                   <small>{d.path}</small>
                   {query && (
                     <p>
