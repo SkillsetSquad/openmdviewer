@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "postbuild": "node scripts/prepare-static.mjs",
-    "prebuild": "node scripts/build-worker.mjs",
+    "prebuild": "node scripts/prepare-build.mjs && node scripts/build-worker.mjs",
     "predev": "node scripts/build-worker.mjs",
     "test:subpath": "node scripts/test-subpath.mjs"
   },

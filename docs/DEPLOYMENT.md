@@ -68,3 +68,7 @@ A CSP is embedded into exported HTML by `scripts/prepare-static.mjs`. The static
 ## Privacy and maintenance
 
 No private tokens are needed to deploy or run the application. CI uses GitHub's scoped temporary deployment token. Review dependency audits when upgrading. Avoid automatic forced major downgrades to silence advisories. HTTPS protects transport; browser-local storage is not application-level encryption.
+
+## Fresh production exports
+
+`npm run build` clears only the generated `out/` directory before compiling. Production Turbopack filesystem caching is disabled so consecutive root and subpath builds compile the current source independently. Development caching remains enabled. This avoids publishing a previous stylesheet observed during local base-path switching and prevents obsolete generated files from being included in the offline cache. Browser documents and source files are not stored in `out/`.
