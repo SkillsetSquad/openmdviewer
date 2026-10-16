@@ -217,3 +217,439 @@ test("workspace ZIP backups restore scoped collection criteria and stable member
   );
   expect(await records(page)).toEqual(unchanged);
 });
+
+import AxeBuilder from "@axe-core/playwright";
+async function library(page: Page) {
+  await page.keyboard.press("Control+k");
+  await page
+    .getByRole("combobox", { name: "Search documents and commands" })
+    .fill("> collections");
+  await page
+    .getByRole("option", { name: "Browse collections", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Collections", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "New collection", exact: true }),
+  ).toBeEnabled();
+  return dialog;
+}
+async function fixtures(page: Page) {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles([
+      {
+        name: "Alpha.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from(
+          "---\ntags: [api]\nowner: Tests\n---\n\n# Alpha article\n\n## Recovery\n\nnebula_keep is the recovery marker. [Missing](Missing.md).\n",
+        ),
+      },
+      {
+        name: "Beta.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from(
+          "---\ntags: [ops]\nowner: Tests\nlast_reviewed: 2026-10-01\nnext_review: 2099-01-01\n---\n\n# Beta article\n\nA separate healthy article.\n",
+        ),
+      },
+    ]);
+  await expect(
+    page.getByRole("heading", { name: "Alpha article", exact: true }),
+  ).toBeVisible();
+}
+async function createManual(page: Page, name: string) {
+  const dialog = await library(page);
+  await dialog
+    .getByRole("button", { name: "New collection", exact: true })
+    .click();
+  await dialog.getByLabel("Collection name", { exact: true }).fill(name);
+  await dialog.getByRole("checkbox", { name: /Alpha/ }).check();
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("heading", { name, exact: true }),
+  ).toBeVisible();
+  return dialog;
+}
+test("manual groups create, edit, rename and delete without changing source or crossing workspaces", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const before = await records(page);
+  const dialog = await createManual(page, "Reading list");
+  const view = dialog.getByRole("region", { name: "Collection documents" });
+  await expect(view.getByRole("button", { name: /Alpha/ })).toBeVisible();
+  await expect(view.getByRole("button", { name: /Beta/ })).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Edit collection", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Collection name", { exact: true })
+    .fill("Keep reading");
+  await dialog.getByRole("checkbox", { name: /Beta/ }).check();
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(
+    view.getByRole("heading", { name: "Keep reading", exact: true }),
+  ).toBeVisible();
+  await expect(view.getByRole("button", { name: /Beta/ })).toBeVisible();
+  expect((await records(page)).documents).toEqual(before.documents);
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "Delete Keep reading?" }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Delete collection", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", {
+      name: "Open collection: Keep reading",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  expect((await records(page)).documents).toEqual(before.documents);
+  await dialog
+    .getByRole("button", { name: "New collection", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Collection name", { exact: true })
+    .fill("Scoped group");
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(
+    view.getByRole("heading", { name: "Scoped group", exact: true }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Manage workspaces", exact: true })
+    .click();
+  const manager = page.getByRole("dialog", { name: "Your local workspaces" });
+  await manager
+    .getByRole("button", { name: "New workspace", exact: true })
+    .click();
+  await manager
+    .getByLabel("Workspace name", { exact: true })
+    .fill("Another collection workspace");
+  await manager
+    .getByRole("button", { name: "Create workspace", exact: true })
+    .click();
+  await expect(manager).toHaveCount(0);
+  const other = await library(page);
+  await expect(
+    other.getByRole("button", {
+      name: "Open collection: Scoped group",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+});
+test("tag and saved-search groups use live local metadata and open actual matching passages", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const dialog = await library(page);
+  await dialog
+    .getByRole("button", { name: "New collection", exact: true })
+    .click();
+  await dialog.getByLabel("Collection name", { exact: true }).fill("API group");
+  await dialog
+    .getByRole("combobox", { name: "Collection type", exact: true })
+    .selectOption("tag");
+  await dialog.getByLabel("Tag", { exact: true }).fill("API");
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  const view = dialog.getByRole("region", { name: "Collection documents" });
+  await expect(view.getByRole("button", { name: /Alpha/ })).toBeVisible();
+  await expect(view.getByRole("button", { name: /Beta/ })).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "New collection", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Collection name", { exact: true })
+    .fill("Recovery query");
+  await dialog
+    .getByRole("combobox", { name: "Collection type", exact: true })
+    .selectOption("search");
+  await dialog
+    .getByLabel("Saved query", { exact: true })
+    .fill('heading:Recovery "nebula_keep"');
+  await dialog
+    .getByRole("combobox", { name: "Search matching", exact: true })
+    .selectOption("literal");
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(view.getByRole("button", { name: /Alpha/ })).toBeVisible();
+  await expect(view.getByRole("button", { name: /Beta/ })).toHaveCount(0);
+  await view.getByRole("button", { name: /Alpha/ }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Recovery", exact: true }),
+  ).toBeVisible();
+  const again = await library(page);
+  await again
+    .getByRole("button", {
+      name: "Open collection: Recovery query",
+      exact: true,
+    })
+    .click();
+  await expect(
+    again
+      .getByRole("region", { name: "Collection documents" })
+      .getByRole("button", { name: /Alpha/ }),
+  ).toBeVisible();
+  await again
+    .getByRole("button", { name: "Edit collection", exact: true })
+    .click();
+  await again.getByLabel("Saved query", { exact: true }).fill("[");
+  await again
+    .getByRole("combobox", { name: "Search matching", exact: true })
+    .selectOption("regex");
+  await again
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(again.getByRole("alert")).toContainText(
+    /regular expression|regular-expression|Invalid/i,
+  );
+});
+test("two tabs retain collection drafts and reject stale edits and deletions", async ({
+  page,
+  context,
+}) => {
+  await fixtures(page);
+  const first = await createManual(page, "Original group");
+  await first
+    .getByRole("button", { name: "Edit collection", exact: true })
+    .click();
+  await first
+    .getByLabel("Collection name", { exact: true })
+    .fill("First draft");
+  const second = await context.newPage();
+  await second.goto("./");
+  await expect(
+    second.getByRole("heading", { name: "Alpha article", exact: true }),
+  ).toBeVisible();
+  const other = await library(second);
+  await other
+    .getByRole("button", {
+      name: "Open collection: Original group",
+      exact: true,
+    })
+    .click();
+  await other
+    .getByRole("button", { name: "Edit collection", exact: true })
+    .click();
+  await other
+    .getByLabel("Collection name", { exact: true })
+    .fill("Second saved");
+  await other
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(
+    other.getByRole("heading", { name: "Second saved", exact: true }),
+  ).toBeVisible();
+  await page.bringToFront();
+  await first
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(first.getByRole("alert")).toContainText(
+    "changed in another tab",
+  );
+  await expect(
+    first.getByLabel("Collection name", { exact: true }),
+  ).toHaveValue("First draft");
+  await expect(
+    first.getByRole("button", { name: "Save collection", exact: true }),
+  ).toBeDisabled();
+  await first
+    .getByRole("button", { name: "Save draft as new collection", exact: true })
+    .click();
+  await expect(
+    first.getByRole("heading", { name: "First draft", exact: true }),
+  ).toBeVisible();
+  await first
+    .getByRole("button", { name: "Open collection: Second saved", exact: true })
+    .click();
+  await first.getByRole("button", { name: "Delete", exact: true }).click();
+  await second.bringToFront();
+  await other
+    .getByRole("button", { name: "Edit collection", exact: true })
+    .click();
+  await other
+    .getByLabel("Collection name", { exact: true })
+    .fill("Newer saved");
+  await other
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(
+    other.getByRole("heading", { name: "Newer saved", exact: true }),
+  ).toBeVisible();
+  await page.bringToFront();
+  await first
+    .getByRole("button", { name: "Delete collection", exact: true })
+    .click();
+  await expect(first.getByRole("alert")).toContainText(
+    "changed in another tab",
+  );
+  expect((await records(page)).collections.map((c) => c.name).sort()).toEqual([
+    "First draft",
+    "Newer saved",
+  ]);
+  await second.close();
+});
+test("built-in reading, review and issue views report local evidence and remain accessible on mobile", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page
+    .getByRole("button", { name: "Add to favorites", exact: true })
+    .click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dialog = await library(page);
+  const view = dialog.getByRole("region", { name: "Collection documents" });
+  await expect(view.getByRole("button", { name: /Alpha/ })).toBeVisible();
+  await expect(view.getByRole("button", { name: /Beta/ })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Favorites", exact: true }).click();
+  await expect(view.getByRole("button", { name: /Alpha/ })).toBeVisible();
+  await expect(view.getByRole("button", { name: /Beta/ })).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Needs review", exact: true })
+    .click();
+  await expect(view.getByRole("button", { name: /Alpha/ })).toBeVisible();
+  await expect(view.getByRole("button", { name: /Beta/ })).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Documentation issues", exact: true })
+    .click();
+  await expect(view.getByRole("button", { name: /Alpha/ })).toBeVisible();
+  const violations = (
+    await new AxeBuilder({ page }).include("dialog").analyze()
+  ).violations.filter((v) => ["serious", "critical"].includes(v.impact || ""));
+  expect(violations).toEqual([]);
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  await page.screenshot({
+    path: "test-results/collections-mobile.png",
+    animations: "disabled",
+  });
+  await dialog
+    .getByRole("button", { name: "New collection", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Collection name", { exact: true })
+    .fill("<img src=x onerror=alert(1)>");
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("heading", {
+      name: "<img src=x onerror=alert(1)>",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(dialog.locator("img,script")).toHaveCount(0);
+});
+test("manual selection and saved searches paginate the complete generated collection", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  const generated: Record<string, Uint8Array> = {};
+  for (let n = 0; n < 125; n++)
+    generated[`Bench/Article_${String(n).padStart(3, "0")}.md`] = strToU8(
+      `# Generated article ${n}\n\ncollection_marker_all\n`,
+    );
+  await page
+    .locator("input[type=file]")
+    .first()
+    .setInputFiles({
+      name: "generated.zip",
+      mimeType: "application/zip",
+      buffer: Buffer.from(zipSync(generated)),
+    });
+  await expect(
+    page.getByText("140 documents, all local", { exact: true }),
+  ).toBeVisible();
+  const dialog = await library(page);
+  await dialog
+    .getByRole("button", { name: "New collection", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Collection name", { exact: true })
+    .fill("Generated library");
+  await dialog
+    .getByLabel("Filter collection documents", { exact: true })
+    .fill("Bench/");
+  await expect(dialog.getByRole("checkbox")).toHaveCount(50);
+  await dialog
+    .getByRole("button", { name: "Select matches", exact: true })
+    .click();
+  await expect(
+    dialog.getByText("125 selected.", { exact: false }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Next documents", exact: true })
+    .click();
+  await expect(dialog.getByRole("checkbox")).toHaveCount(50);
+  await dialog
+    .getByRole("button", { name: "Next documents", exact: true })
+    .click();
+  await expect(dialog.getByRole("checkbox")).toHaveCount(25);
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  const view = dialog.getByRole("region", { name: "Collection documents" });
+  await expect(view.locator(".collection-documents li")).toHaveCount(50);
+  expect(
+    (await records(page)).collections.find(
+      (c) => c.name === "Generated library",
+    )?.documentIds,
+  ).toHaveLength(125);
+  await dialog
+    .getByRole("button", { name: "New collection", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Collection name", { exact: true })
+    .fill("Generated search");
+  await dialog
+    .getByRole("combobox", { name: "Collection type", exact: true })
+    .selectOption("search");
+  await dialog
+    .getByLabel("Saved query", { exact: true })
+    .fill("collection_marker_all");
+  await dialog
+    .getByRole("combobox", { name: "Search matching", exact: true })
+    .selectOption("literal");
+  await dialog
+    .getByRole("button", { name: "Save collection", exact: true })
+    .click();
+  await expect(view.locator(".collection-documents li")).toHaveCount(50);
+  await expect(view.getByRole("status")).toContainText("125 matching");
+  await view.getByRole("button", { name: "Next results", exact: true }).click();
+  await expect(view.getByRole("status")).toContainText("51–100");
+  await view.getByRole("button", { name: "Next results", exact: true }).click();
+  await expect(view.locator(".collection-documents li")).toHaveCount(25);
+  await expect(
+    view.getByRole("button", { name: "Next results", exact: true }),
+  ).toBeDisabled();
+  const desktopViolations = (
+    await new AxeBuilder({ page }).include("dialog").analyze()
+  ).violations.filter((v) => ["serious", "critical"].includes(v.impact || ""));
+  expect(desktopViolations).toEqual([]);
+  await page.screenshot({
+    path: "test-results/collections-desktop.png",
+    animations: "disabled",
+  });
+});

@@ -457,3 +457,36 @@ it("rejects missing archive members before applying document metadata and keeps 
   expect(doc).toEqual(previous);
   expect(applyWorkspaceMetadata([doc], workspaceMetadata([doc]))).toEqual([]);
 });
+
+it("records actual openings separately from edits and scopes activity to live workspace documents", async () => {
+  const { storage } = make();
+  await storage.initialize([]);
+  const other = await storage.createWorkspace("Other");
+  const one = await storage.put(newDocument("One.md", "# One")),
+    two = await storage.put(newDocument("Two.md", "# Two"));
+  const before = await storage.load();
+  await storage.markOpened("default", two.id);
+  await storage.markOpened(other.id, one.id);
+  await storage.markOpened("default", "missing");
+  expect(await storage.recentDocuments("default")).toEqual([
+    {
+      workspaceId: "default",
+      documentId: two.id,
+      openedAt: expect.any(Number),
+    },
+  ]);
+  expect(await storage.recentDocuments(other.id)).toEqual([]);
+  expect(await storage.load()).toEqual(before);
+  expect(await storage.snapshots(two.id)).toEqual([]);
+  await storage.trash(one, 0);
+  await storage.markOpened("default", one.id);
+  expect(await storage.recentDocuments("default")).toHaveLength(1);
+  expect(
+    workspaceMetadata(
+      await storage.load(),
+      undefined,
+      await storage.collections("default"),
+    ),
+  ).not.toContain("openedAt");
+  storage.close();
+});

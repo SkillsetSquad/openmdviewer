@@ -138,3 +138,9 @@ export function collectionsFromArchive(
     });
   });
 }
+
+export interface ReadingActivity {
+  workspaceId: string;
+  documentId: string;
+  openedAt: number;
+}

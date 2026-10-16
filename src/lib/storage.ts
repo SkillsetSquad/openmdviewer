@@ -5,6 +5,7 @@ import {
   normalizeCollection,
   type CollectionDraft,
   type ReaderCollection,
+  type ReadingActivity,
 } from "./collections";
 import {
   assetBytes,
@@ -58,6 +59,7 @@ export function createStorage(name = "openmdviewer") {
     fileSources: EntityTable<LocalFileSource, "documentId">;
     directorySources: EntityTable<LocalDirectorySource, "workspaceId">;
     collections: EntityTable<ReaderCollection, "id">;
+    readingActivity: Table<ReadingActivity, [string, string]>;
   };
   db.version(1).stores({ documents: "id, path, updatedAt, favorite" });
   db.version(2).stores({
@@ -98,6 +100,9 @@ export function createStorage(name = "openmdviewer") {
   db.version(5).stores({ fileSources: "documentId, workspaceId" });
   db.version(6).stores({ directorySources: "workspaceId" });
   db.version(7).stores({ collections: "id, workspaceId, updatedAt" });
+  db.version(8).stores({
+    readingActivity: "[workspaceId+documentId], workspaceId",
+  });
   const scoped = (id = "default") =>
     db.documents.where("workspaceId").equals(id);
   async function ensurePath(doc: ReaderDocument) {
@@ -200,6 +205,28 @@ export function createStorage(name = "openmdviewer") {
   }
   const api = {
     close: () => db.close(),
+    recentDocuments: (workspaceId: string) =>
+      db.readingActivity
+        .where("workspaceId")
+        .equals(workspaceId)
+        .sortBy("openedAt")
+        .then((items) => items.reverse()),
+    markOpened: (workspaceId: string, documentId: string) =>
+      db.transaction("rw", db.documents, db.readingActivity, async () => {
+        const doc = await db.documents.get(documentId);
+        if (
+          !doc ||
+          doc.deletedAt ||
+          (doc.workspaceId || "default") !== workspaceId
+        )
+          return;
+        const current = await db.readingActivity.get([workspaceId, documentId]);
+        await db.readingActivity.put({
+          workspaceId,
+          documentId,
+          openedAt: Math.max(Date.now(), current?.openedAt || 0),
+        });
+      }),
     collections: (workspaceId: string) =>
       db.collections
         .where("workspaceId")

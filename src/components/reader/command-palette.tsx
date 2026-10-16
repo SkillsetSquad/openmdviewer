@@ -14,6 +14,7 @@ import {
   HardDrive,
   Info,
   Link2,
+  LibraryBig,
   Maximize2,
   Moon,
   Network,
@@ -46,6 +47,7 @@ import { fileName } from "@/lib/paths";
 
 const icons = {
   files: Upload,
+  collections: LibraryBig,
   localFile: HardDrive,
   folder: FolderOpen,
   new: FilePlus2,

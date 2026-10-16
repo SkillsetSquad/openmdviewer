@@ -41,6 +41,7 @@ import {
   Info,
   Link2,
   List,
+  LibraryBig,
   Maximize2,
   Menu,
   Moon,
@@ -110,6 +111,7 @@ const LocalFileDialog = lazy(() => import("./local-file-dialog"));
 const Annotations = lazy(() => import("./annotations"));
 const CommandPalette = lazy(() => import("./command-palette"));
 const WorkspaceGraph = lazy(() => import("./workspace-graph"));
+const CollectionsDialog = lazy(() => import("./collections-dialog"));
 const Insights = lazy(() => import("./insights"));
 const DocumentProperties = lazy(() => import("./document-properties"));
 const Editor = lazy(() => import("./editor"));
@@ -133,6 +135,7 @@ type DialogName =
   | "notes"
   | "properties"
   | "help"
+  | "collections"
   | "workspaces"
   | "history"
   | "trash"
@@ -194,6 +197,14 @@ export default function Workspace() {
     resolveConflict,
     resolvingConflict,
   } = session;
+  useEffect(() => {
+    if (!loaded || switching || !activeId) return;
+    void storage
+      .markOpened(workspaceId, activeId)
+      .catch(() =>
+        notify("Reading history could not be saved in this browser."),
+      );
+  }, [loaded, switching, activeId, workspaceId, notify]);
   const [dialog, setDialog] = useState<DialogName>(null);
   const [conversionRequest, setConversionRequest] = useState<{
     id: string;
@@ -690,7 +701,7 @@ export default function Workspace() {
     setDocuments([...useReader.getState().documents, ...additions]);
     if (additions[0]) openDocument(additions[0].id);
     notify(
-      `Imported ${additions.length} documents and ${imported.assets.length} ${imported.assets.some((asset) => sourceAssetType(asset.path)) ? "assets (including originals)" : "media files"}. Kept on this device.`,
+      `Imported ${additions.length} documents and ${imported.assets.length} ${imported.assets.some((asset) => sourceAssetType(asset.path)) ? "assets (including originals)" : "media files"}${imported.collections?.length ? ` and ${imported.collections.length} collections` : ""}. Kept on this device.`,
     );
   }
   async function importFiles(files: File[]) {
@@ -788,6 +799,9 @@ export default function Workspace() {
           break;
         case "settings":
           setDialog("settings");
+          break;
+        case "collections":
+          if (await flushEdit()) setDialog("collections");
           break;
         case "workspaces":
           setDialog("workspaces");
@@ -907,6 +921,14 @@ export default function Workspace() {
       block: "center",
     });
   }
+  const requestCollectionSearch = useCallback(
+    (value: string, options: SearchOptions, offset: number) => {
+      setQueryValue(value);
+      setSearchOptions(options);
+      setSearchOffset(offset);
+    },
+    [],
+  );
   const commandsOnly = query.trimStart().startsWith(">");
   const documentQuery = commandsOnly ? "" : query;
   const {
@@ -1167,10 +1189,21 @@ export default function Workspace() {
                 Favorites
               </button>
               <button
+                aria-label="Browse collections"
+                title="Browse collections"
+                onClick={() => {
+                  void flushEdit().then((ok) => {
+                    if (ok) setDialog("collections");
+                  });
+                }}
+              >
+                <LibraryBig size={14} />
+              </button>
+              <button
                 className={collection === "recent" ? "active" : ""}
                 onClick={() => setCollection("recent")}
-                aria-label="Recent documents"
-                title="Recent documents"
+                aria-label="Recently updated documents"
+                title="Recently updated documents"
               >
                 <History size={14} />
               </button>
@@ -2419,6 +2452,42 @@ export default function Workspace() {
                   .documents.find((item) => item.id === snapshot.id) || null
               );
             }}
+          />
+        </Suspense>
+      )}
+      {dialog === "collections" && (
+        <Suspense
+          fallback={
+            <div className="toast" role="status">
+              Opening collections…
+            </div>
+          }
+        >
+          <CollectionsDialog
+            key={workspaceId}
+            workspaceId={workspaceId}
+            documents={documents}
+            summaries={documentSummaries}
+            indexing={indexing}
+            assetPaths={Object.keys(assetURLs)}
+            search={{
+              query,
+              options: searchOptions,
+              page: searchPage,
+              failed: searchFailed,
+              offset: searchOffset,
+            }}
+            onSearch={requestCollectionSearch}
+            onCancelSearch={cancelRegexSearch}
+            onRetrySearch={retryRegexSearch}
+            onOpen={(id, hit) => {
+              if (hit) void openSearchResult(id, hit);
+              else {
+                openDocument(id);
+                setDialog(null);
+              }
+            }}
+            onClose={() => setDialog(null)}
           />
         </Suspense>
       )}

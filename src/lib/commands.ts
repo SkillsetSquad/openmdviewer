@@ -41,6 +41,12 @@ export const commands = [
     quick: true,
   },
   {
+    id: "collections",
+    label: "Browse collections",
+    keywords:
+      "manual tag saved search reading list review recent favorites groups",
+  },
+  {
     id: "settings",
     label: "Reading settings",
     keywords: "preferences font typography theme appearance",
