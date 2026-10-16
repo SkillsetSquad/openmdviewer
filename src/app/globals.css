@@ -5400,3 +5400,6 @@ kbd {
 .collection-library button[aria-current="page"] small {
   color: var(--foreground);
 }
+.collections-dialog > .dialog-heading {
+  padding: 0;
+}
