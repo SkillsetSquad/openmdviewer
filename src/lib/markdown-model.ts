@@ -8,7 +8,7 @@ import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkRehype from "remark-rehype";
-import rehypeRaw from "rehype-raw";
+import { rehypeRawWhenNeeded } from "./markdown-raw";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import { visit } from "unist-util-visit";
@@ -85,7 +85,7 @@ const html = unified()
     allowDangerousHtml: true,
     handlers: defListHastHandlers,
   })
-  .use(rehypeRaw)
+  .use(rehypeRawWhenNeeded)
   .use(rehypeRememberAnchors)
   .use(rehypeSanitize, markdownSchema)
   .use(rehypeCalloutLabels)

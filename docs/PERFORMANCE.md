@@ -16,4 +16,12 @@ The regression tests verify that a document above one MiB is reused and that lar
 
 A local Chromium comparison used the same generated 1,049,432-byte technical manual in Node 24 production builds: 2,502 headings, 100 code blocks, 50 tables and 125 local image references. Three runs per build retained all 2,502 rendered headings and 18,994 DOM elements. Median import-to-rendered-DOM time changed from 2,546 ms to 1,352 ms; median maximum long-task duration changed from 2,202 ms to 1,002 ms. A separate generated 1,200-document ZIP import and unique-result worker search also completed in each run. These measurements describe that local fixture and machine; they are not cross-device performance guarantees or target-host certification.
 
-The reader still performs model parsing and rendered Markdown work synchronously. The remaining approximately one-second long task in this fixture is a known responsiveness gap. Worker/progressive rendering work and broader document-size/hardware measurements remain necessary. This cache change does not constitute completion of the product brief's full performance requirements.
+## Conditional HTML normalization
+
+Plain Markdown already has a structured HTML tree after remark-rehype. The shared reader, metadata and HTML-export pipelines skip an extra HTML parser round trip when that tree has neither raw source nodes nor generated footnote data attributes. Raw nodes are detected at every depth. Raw HTML and generated footnotes retain the original normalization path, and every tree still passes through the sanitizer. Existing Markdown rendering, math, source locations and media-consent controls remain in place.
+
+Raw HTML fixtures retain identical sanitized output. Plain Markdown comparisons preserve semantic tags, attributes and text; table-container/root whitespace serialization can differ. The reader's JSX/table renderers already ignore that structural whitespace. Generated footnote attributes keep their exact existing normalization, and source-position tests cover the direct structured-tree path.
+
+Three further local runs of the same generated manual with both changes retained all headings and DOM elements. Median import-to-rendered-DOM time was 1,173 ms and median maximum long-task duration was 817 ms. This is an incremental improvement over the cache-only measurements above, with the same local-fixture limitations.
+
+The reader still performs model parsing and rendered Markdown work synchronously. The remaining approximately 0.8-second long task in this fixture is a known responsiveness gap. Worker/progressive rendering work and broader document-size/hardware measurements remain necessary. These changes do not constitute completion of the product brief's full performance requirements.

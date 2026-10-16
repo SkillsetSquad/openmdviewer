@@ -8,7 +8,7 @@ import {
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import rehypeRaw from "rehype-raw";
+import { rehypeRawWhenNeeded } from "@/lib/markdown-raw";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import rehypeKatex from "rehype-katex";
@@ -157,7 +157,7 @@ export const Markdown = memo(function Markdown({
           ]}
           remarkRehypeOptions={{ handlers: defListHastHandlers }}
           rehypePlugins={[
-            rehypeRaw,
+            rehypeRawWhenNeeded,
             rehypeRememberAnchors,
             [rehypeSanitize, markdownSchema],
             rehypeCalloutLabels,
