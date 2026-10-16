@@ -15,13 +15,25 @@ export interface ReaderDocument {
 }
 export type ReadingMode = "read" | "split" | "source";
 export type ReaderTheme =
-  "dark" | "light" | "sepia" | "oled" | "contrast" | "system";
+  | "dark"
+  | "light"
+  | "sepia"
+  | "paper"
+  | "oled"
+  | "contrast"
+  | "system"
+  | "custom";
 export interface Preferences {
   theme: ReaderTheme;
   fontSize: number;
   lineHeight: number;
   readingWidth: number;
   fontFamily: "sans" | "serif" | "mono";
+  headingFont: "sans" | "serif" | "mono";
+  codeFont: "geist" | "system" | "courier";
+  paragraphSpacing: number;
+  documentPadding: number;
+  customPalette: import("./preferences").CustomPalette;
 }
 export interface Heading {
   id: string;

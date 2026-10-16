@@ -278,6 +278,8 @@ test("printed callouts keep a readable paper palette in every reading theme", as
     "dark",
     "light",
     "sepia",
+    "paper",
+    "custom",
     "oled",
     "contrast",
     "system",

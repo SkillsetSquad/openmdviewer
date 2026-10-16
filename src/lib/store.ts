@@ -1,3 +1,4 @@
+import { defaultPreferences } from "./preferences";
 import { create } from "zustand";
 import type { Preferences, ReaderDocument, ReadingMode } from "./types";
 interface ReaderState {
@@ -19,13 +20,7 @@ export const useReader = create<ReaderState>((set) => ({
   activeId: "example-0",
   tabs: ["example-0"],
   mode: "read",
-  preferences: {
-    theme: "dark",
-    fontSize: 15,
-    lineHeight: 1.75,
-    readingWidth: 1100,
-    fontFamily: "sans",
-  },
+  preferences: { ...defaultPreferences },
   setDocuments: (documents) => set({ documents }),
   open: (id) =>
     set((s) => ({

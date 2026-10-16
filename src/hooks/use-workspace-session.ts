@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { parsePreferences } from "@/lib/preferences";
 import { SaveLedger } from "@/lib/save-ledger";
 import { storage, DocumentConflict } from "@/lib/storage";
 import { exampleDocuments } from "@/lib/examples";
@@ -16,29 +17,10 @@ const urlsFor = (assets: ReaderAsset[]) =>
   Object.fromEntries(assets.map((a) => [a.path, URL.createObjectURL(a.blob)]));
 const readPreference = (current: Preferences): Preferences => {
   try {
-    const p = JSON.parse(
-      localStorage.getItem("openmdviewer.preferences") || "{}",
+    return parsePreferences(
+      JSON.parse(localStorage.getItem("openmdviewer.preferences") || "{}"),
+      current,
     );
-    return {
-      ...current,
-      theme: ["dark", "light", "sepia", "oled", "contrast", "system"].includes(
-        p.theme,
-      )
-        ? p.theme
-        : current.theme,
-      fontFamily: ["sans", "serif", "mono"].includes(p.fontFamily)
-        ? p.fontFamily
-        : current.fontFamily,
-      fontSize: Number.isFinite(p.fontSize)
-        ? Math.max(12, Math.min(24, p.fontSize))
-        : current.fontSize,
-      lineHeight: Number.isFinite(p.lineHeight)
-        ? Math.max(1.3, Math.min(2.2, p.lineHeight))
-        : current.lineHeight,
-      readingWidth: Number.isFinite(p.readingWidth)
-        ? Math.max(600, Math.min(1400, p.readingWidth))
-        : current.readingWidth,
-    };
   } catch {
     return current;
   }

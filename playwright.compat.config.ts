@@ -5,7 +5,7 @@ import readerConfig from "./playwright.config";
 // routing differs around service workers; real provider checks stay separate.
 export default defineConfig({
   ...readerConfig,
-  testMatch: "reader.spec.ts",
+  testMatch: ["reader.spec.ts", "preferences.spec.ts"],
   projects: [
     {
       name: "firefox",

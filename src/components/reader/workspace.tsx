@@ -61,6 +61,8 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ReadingSettings } from "./reading-settings";
+import { customPaletteDark, readingStyle } from "@/lib/preferences";
 import { FileTree } from "./file-tree";
 import { DocumentTabs, documentTabId } from "./document-tabs";
 import { Modal } from "./modal";
@@ -97,12 +99,7 @@ import {
   stats,
   supportedFile,
 } from "@/lib/documents";
-import type {
-  ReaderDocument,
-  ReaderTheme,
-  ReaderAnnotation,
-  TextQuote,
-} from "@/lib/types";
+import type { ReaderDocument, ReaderAnnotation, TextQuote } from "@/lib/types";
 const ConversionDialog = lazy(() => import("./conversion-dialog"));
 const URLImportDialog = lazy(() => import("./url-import-dialog"));
 const RepositoryDialog = lazy(() => import("./repository-dialog"));
@@ -346,6 +343,8 @@ export default function Workspace() {
   const outline = useMemo(() => headings(doc?.content || ""), [doc?.content]);
   const metadata = useMemo(() => stats(doc?.content || ""), [doc?.content]);
   const dark =
+    (preferences.theme === "custom" &&
+      customPaletteDark(preferences.customPalette)) ||
     ["dark", "oled", "contrast"].includes(preferences.theme) ||
     (preferences.theme === "system" &&
       typeof window !== "undefined" &&
@@ -985,20 +984,12 @@ export default function Workspace() {
 
   return (
     <div
-      className={`workspace theme-${preferences.theme} ${focus ? "focus-mode" : ""} ${presentation ? "presentation-mode" : ""}`}
+      className={`workspace theme-${preferences.theme} ${preferences.theme === "custom" ? (dark ? "custom-dark" : "custom-light") : ""} ${focus ? "focus-mode" : ""} ${presentation ? "presentation-mode" : ""}`}
       style={
         {
           "--left-width": `${leftWidth}px`,
           "--right-width": `${rightWidth}px`,
-          "--reader-size": `${preferences.fontSize}px`,
-          "--reader-leading": preferences.lineHeight,
-          "--reader-width": `${preferences.readingWidth}px`,
-          "--reader-font":
-            preferences.fontFamily === "serif"
-              ? "Georgia, serif"
-              : preferences.fontFamily === "mono"
-                ? "var(--font-geist-mono), monospace"
-                : "var(--font-geist-sans), sans-serif",
+          ...readingStyle(preferences),
         } as CSSProperties
       }
       onDragOver={(e) => e.preventDefault()}
@@ -2422,98 +2413,11 @@ export default function Workspace() {
         </Suspense>
       )}
       {dialog === "settings" && (
-        <Modal title="Make yourself at home" onClose={() => setDialog(null)}>
-          <p className="dialog-description">
-            A reading space that feels like yours. Preferences stay on this
-            device.
-          </p>
-          <div className="settings-form">
-            <label>
-              Appearance
-              <select
-                value={preferences.theme}
-                onChange={(e) =>
-                  setPreferences({ theme: e.target.value as ReaderTheme })
-                }
-              >
-                <option value="dark">Midnight · Dark</option>
-                <option value="light">Daylight · Light</option>
-                <option value="sepia">Warm paper · Sepia</option>
-                <option value="oled">Lights out · OLED</option>
-                <option value="contrast">High contrast</option>
-                <option value="system">Match system</option>
-              </select>
-            </label>
-            <label>
-              Typography
-              <select
-                value={preferences.fontFamily}
-                onChange={(e) =>
-                  setPreferences({
-                    fontFamily: e.target.value as "sans" | "serif" | "mono",
-                  })
-                }
-              >
-                <option value="sans">Sans serif</option>
-                <option value="serif">Literary serif</option>
-                <option value="mono">Monospace</option>
-              </select>
-            </label>
-            <label>
-              Text size <span>{preferences.fontSize}px</span>
-              <input
-                type="range"
-                min="12"
-                max="24"
-                value={preferences.fontSize}
-                onChange={(e) => setPreferences({ fontSize: +e.target.value })}
-              />
-            </label>
-            <label>
-              Line spacing <span>{preferences.lineHeight}</span>
-              <input
-                type="range"
-                min="1.3"
-                max="2.2"
-                step="0.05"
-                value={preferences.lineHeight}
-                onChange={(e) =>
-                  setPreferences({ lineHeight: +e.target.value })
-                }
-              />
-            </label>
-            <label>
-              Reading width <span>{preferences.readingWidth}px</span>
-              <input
-                type="range"
-                min="600"
-                max="1400"
-                step="20"
-                value={preferences.readingWidth}
-                onChange={(e) =>
-                  setPreferences({ readingWidth: +e.target.value })
-                }
-              />
-            </label>
-          </div>
-          <div className="dialog-buttons">
-            <Button
-              variant="outline"
-              onClick={() =>
-                setPreferences({
-                  theme: "dark",
-                  fontSize: 15,
-                  lineHeight: 1.75,
-                  readingWidth: 1100,
-                  fontFamily: "sans",
-                })
-              }
-            >
-              Reset defaults
-            </Button>
-            <Button onClick={() => setDialog(null)}>Done</Button>
-          </div>
-        </Modal>
+        <ReadingSettings
+          preferences={preferences}
+          onChange={setPreferences}
+          onClose={() => setDialog(null)}
+        />
       )}
       {(dialog === "new" || dialog === "rename" || dialog === "tags") && (
         <Modal
