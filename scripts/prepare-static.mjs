@@ -66,8 +66,17 @@ const urls = files.map((file) => {
 urls.push(`${base}/`);
 const hash = createHash("sha256");
 // Include worker behavior and URL scope, not just asset bytes, in cache identity.
-hash.update(offlineWorkerSource({ base, urls, version: "__BUILD_REVISION__" }));
-for (const file of files) hash.update(await readFile(file));
+function fingerprintPart(bytes) {
+  // Frame every input so moving bytes between adjacent files changes identity.
+  hash.update(`${bytes.byteLength}:`);
+  hash.update(bytes);
+}
+fingerprintPart(
+  Buffer.from(
+    offlineWorkerSource({ base, urls, version: "__BUILD_REVISION__" }),
+  ),
+);
+for (const file of files) fingerprintPart(await readFile(file));
 const version = hash.digest("hex").slice(0, 16);
 await writeFile("out/sw.js", offlineWorkerSource({ base, urls, version }));
 

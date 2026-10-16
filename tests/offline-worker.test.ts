@@ -317,7 +317,7 @@ it("serves only fixed same-origin GET assets and canonical navigation without ca
   expect(worker.fetch.mock.calls.length).toBe(count);
   expect(worker.writes).toHaveLength(2);
 });
-it("versions the actual generated cache from worker behavior even when exported asset bytes are unchanged", async () => {
+it("versions the generated cache from worker behavior and length-framed asset bytes", async () => {
   const stage = await mkdtemp(
     path.join(tmpdir(), "openmdviewer-cache-version-"),
   );
@@ -326,13 +326,15 @@ it("versions the actual generated cache from worker behavior even when exported 
     const worker = await readFile("scripts/offline-worker.mjs", "utf8");
     await mkdir(path.join(stage, "scripts"));
     await writeFile(path.join(stage, "scripts/prepare-static.mjs"), script);
-    const build = async (source: string) => {
+    const build = async (source: string, parts = ["ab", "c"]) => {
       await rm(path.join(stage, "out"), { recursive: true, force: true });
       await mkdir(path.join(stage, "out"));
       await writeFile(
         path.join(stage, "out/index.html"),
         "<html><head></head><body>Same assets</body></html>",
       );
+      for (const [index, content] of parts.entries())
+        await writeFile(path.join(stage, "out", `part-${index}.txt`), content);
       const specialNames = [
         "space #.txt",
         "icon@2x.png",
@@ -373,6 +375,9 @@ it("versions the actual generated cache from worker behavior even when exported 
     );
     expect(changed.asset).toBe(original.asset);
     expect(changed.cache).not.toBe(original.cache);
+    // These adjacent files have the same concatenated bytes (abc), but each
+    // changed file must still invalidate the application cache.
+    expect((await build(worker, ["a", "bc"])).cache).not.toBe(original.cache);
     expect(await build(worker)).toEqual(original);
   } finally {
     await rm(stage, { recursive: true, force: true });
