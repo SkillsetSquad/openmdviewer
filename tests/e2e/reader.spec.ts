@@ -1437,3 +1437,44 @@ test("indexes and explores a thousand-document workspace without creating a thou
     contentType: "application/json",
   });
 });
+
+for (const viewport of [
+  { width: 1586, height: 992 },
+  { width: 390, height: 844 },
+]) {
+  test(`contains document overflow within the reader at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("./");
+    await expect(
+      page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+    ).toBeVisible();
+    // This table's offscreen accessibility label used to escape the app shell
+    // and create a second page scrollbar with blank space below the reader.
+    await expect(page.locator(".interactive-table")).toHaveCount(1);
+    const pageSize = () =>
+      page.evaluate(() => ({
+        width: document.documentElement.scrollWidth,
+        height: document.documentElement.scrollHeight,
+      }));
+    expect(await pageSize()).toEqual(viewport);
+    await page.evaluate(() => window.scrollTo(0, 10000));
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    const reader = page.locator(".document-viewport");
+    await reader.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect
+      .poll(() => reader.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+    await expect(
+      page.getByRole("heading", { name: "6. Related Resources", exact: true }),
+    ).toBeVisible();
+    expect(await pageSize()).toEqual(viewport);
+    await page.screenshot({
+      path: `test-results/contained-reader-${viewport.width}.png`,
+      fullPage: true,
+    });
+  });
+}
