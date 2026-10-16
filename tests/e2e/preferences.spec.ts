@@ -194,7 +194,11 @@ test("custom palette validates contrast, persists, selects light syntax and prin
   await again.getByLabel("Text color", { exact: true }).fill("#f5eaff");
   await again.getByLabel("Accent color", { exact: true }).fill("#e2b8ff");
   await again.getByRole("button", { name: "Apply custom colors" }).click();
-  await again.getByRole("button", { name: "Done", exact: true }).click();
+  const darkDone = again.getByRole("button", { name: "Done", exact: true });
+  await darkDone.hover();
+  await expect(darkDone).toHaveCSS("color", "rgb(36, 24, 59)");
+  await expect(darkDone).toHaveCSS("background-color", "rgb(245, 234, 255)");
+  await darkDone.click();
   await expect(page.locator(".workspace")).toHaveClass(/custom-dark/);
   await expect(page.locator(".workspace")).toHaveCSS(
     "background-color",
