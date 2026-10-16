@@ -354,7 +354,9 @@ test("manual groups create, edit, rename and delete without changing source or c
 });
 test("tag and saved-search groups use live local metadata and open actual matching passages", async ({
   page,
+  context,
 }) => {
+  test.setTimeout(150000);
   await fixtures(page);
   const dialog = await library(page);
   await dialog
@@ -395,6 +397,16 @@ test("tag and saved-search groups use live local metadata and open actual matchi
   await expect(dialog).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Recovery", exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller), {
+      timeout: 90000,
+    })
+    .toBe(true);
+  await context.setOffline(true);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Alpha article", exact: true }),
   ).toBeVisible();
   const again = await library(page);
   await again

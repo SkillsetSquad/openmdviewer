@@ -21,7 +21,7 @@ Saved definitions are limited to 100 per workspace, with up to 10,000 manual ref
 - **Needs review** uses the local health worker's missing, invalid or overdue declared review dates. It does not infer an actual human review or organizational approval.
 - **Documentation issues** uses findings from the existing transparent health rules, including informational findings. It is not a factual-accuracy score or an external-link validator.
 
-Review/issue results are explicit local snapshots with a checked time and **Refresh checks**. They use the existing 25-million-character analysis limit. Closing the view terminates its analysis worker. Collection browsing does not contact a remote service.
+Review/issue results are explicit local snapshots with a checked time and **Refresh checks**. They use the existing 25-million-character analysis limit. Closing the view terminates its analysis worker. Collection browsing does not contact a remote service. After the app has prepared its offline cache, saved groups and worker searches can reopen from browser storage without a connection.
 
 ## Edit, delete and conflicting tabs
 
@@ -37,4 +37,4 @@ Only active documents are included in workspace ZIPs. References to browser-loca
 
 ## Verification boundaries
 
-Unit tests cover workspace ownership, simultaneous connections, stale writes/deletes, rename/trash/recovery membership, limits, normalized name collisions, atomic rollback, schema-six migration, ZIP path collisions, unrelated-workspace exclusion, mixed conversion batches and separate reading activity. Browser fixtures exercise real creation/edit/delete, two-tab draft recovery, tag/search navigation, malformed regex, built-in views, source preservation, pagination through 125 generated matches, mobile overflow, accessible controls and ZIP restoration. These generated fixtures do not certify all devices, all shipping browsers or complete WCAG conformance.
+Unit tests cover workspace ownership, simultaneous connections, stale writes/deletes, rename/trash/recovery membership, limits, normalized name collisions, atomic rollback, schema-six migration, ZIP path collisions, unrelated-workspace exclusion, mixed conversion batches and separate reading activity. Browser fixtures exercise real creation/edit/delete, two-tab draft recovery, tag/search navigation after an offline restart, malformed regex, built-in views, source preservation, pagination through 125 generated matches, mobile overflow, accessible controls and ZIP restoration. These generated fixtures do not certify all devices, all shipping browsers or complete WCAG conformance.
