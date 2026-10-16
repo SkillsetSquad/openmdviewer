@@ -305,6 +305,14 @@ summary:focus-visible {
 .workspace button:hover {
   color: var(--foreground);
 }
+/* Keep filled primary actions readable while generic icon buttons change ink on hover. */
+.workspace [data-slot="button"][data-variant="default"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+.workspace [data-slot="button"][data-variant="default"]:hover {
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
 .icon-button {
   display: inline-flex;
   align-items: center;
