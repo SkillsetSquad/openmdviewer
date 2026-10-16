@@ -1,4 +1,13 @@
 import {
+  CollectionConflict,
+  collectionLimit,
+  collectionNameKey,
+  normalizeCollection,
+  type CollectionDraft,
+  type ReaderCollection,
+  type ReadingActivity,
+} from "./collections";
+import {
   assetBytes,
   restoredAsset,
   blobPreparationFailed,
@@ -49,6 +58,8 @@ export function createStorage(name = "openmdviewer") {
     searchHistory: Table<RecentSearch, [string, string]>;
     fileSources: EntityTable<LocalFileSource, "documentId">;
     directorySources: EntityTable<LocalDirectorySource, "workspaceId">;
+    collections: EntityTable<ReaderCollection, "id">;
+    readingActivity: Table<ReadingActivity, [string, string]>;
   };
   db.version(1).stores({ documents: "id, path, updatedAt, favorite" });
   db.version(2).stores({
@@ -88,6 +99,10 @@ export function createStorage(name = "openmdviewer") {
   db.version(4).stores({ searchHistory: "[workspaceId+key], workspaceId" });
   db.version(5).stores({ fileSources: "documentId, workspaceId" });
   db.version(6).stores({ directorySources: "workspaceId" });
+  db.version(7).stores({ collections: "id, workspaceId, updatedAt" });
+  db.version(8).stores({
+    readingActivity: "[workspaceId+documentId], workspaceId",
+  });
   const scoped = (id = "default") =>
     db.documents.where("workspaceId").equals(id);
   async function ensurePath(doc: ReaderDocument) {
@@ -138,8 +153,156 @@ export function createStorage(name = "openmdviewer") {
       return write(await assetBytes(assets));
     }
   }
+  async function checkCollectionMembers(
+    workspaceId: string,
+    draft: CollectionDraft,
+  ) {
+    if (draft.kind !== "manual") return;
+    const documents = await db.documents.bulkGet(draft.documentIds);
+    if (
+      documents.some(
+        (doc) => !doc || (doc.workspaceId || "default") !== workspaceId,
+      )
+    )
+      throw new Error("Collection members must belong to this workspace.");
+  }
+  async function addCollectionImports(
+    workspaceId: string,
+    drafts: CollectionDraft[],
+  ) {
+    if (!drafts.length) return;
+    if (!(await db.workspaces.get(workspaceId)))
+      throw new Error("This workspace is no longer available.");
+    const existing = await db.collections
+      .where("workspaceId")
+      .equals(workspaceId)
+      .toArray();
+    if (drafts.length + existing.length > collectionLimit)
+      throw new Error(
+        `This workspace supports up to ${collectionLimit} collections.`,
+      );
+    const names = new Set(existing.map((item) => collectionNameKey(item.name)));
+    const now = Date.now();
+    for (const value of drafts) {
+      const draft = normalizeCollection(value);
+      await checkCollectionMembers(workspaceId, draft);
+      const original = draft.name;
+      let suffix = 2;
+      while (names.has(collectionNameKey(draft.name))) {
+        const end = ` (imported ${suffix++})`;
+        draft.name = original.slice(0, 80 - end.length).trimEnd() + end;
+      }
+      names.add(collectionNameKey(draft.name));
+      await db.collections.add({
+        ...draft,
+        id: crypto.randomUUID(),
+        workspaceId,
+        revision: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  }
   const api = {
     close: () => db.close(),
+    recentDocuments: (workspaceId: string) =>
+      db.readingActivity
+        .where("workspaceId")
+        .equals(workspaceId)
+        .sortBy("openedAt")
+        .then((items) => items.reverse()),
+    markOpened: (workspaceId: string, documentId: string) =>
+      db.transaction("rw", db.documents, db.readingActivity, async () => {
+        const doc = await db.documents.get(documentId);
+        if (
+          !doc ||
+          doc.deletedAt ||
+          (doc.workspaceId || "default") !== workspaceId
+        )
+          return;
+        const current = await db.readingActivity.get([workspaceId, documentId]);
+        await db.readingActivity.put({
+          workspaceId,
+          documentId,
+          openedAt: Math.max(Date.now(), current?.openedAt || 0),
+        });
+      }),
+    collections: (workspaceId: string) =>
+      db.collections
+        .where("workspaceId")
+        .equals(workspaceId)
+        .sortBy("createdAt"),
+    putCollection: (
+      workspaceId: string,
+      value: CollectionDraft,
+      expected?: { id: string; revision: number },
+    ) =>
+      db.transaction(
+        "rw",
+        db.workspaces,
+        db.documents,
+        db.collections,
+        async () => {
+          if (!(await db.workspaces.get(workspaceId)))
+            throw new Error("This workspace is no longer available.");
+          const draft = normalizeCollection(value);
+          const current = expected
+            ? await db.collections.get(expected.id)
+            : undefined;
+          if (
+            expected &&
+            (!current ||
+              current.workspaceId !== workspaceId ||
+              current.revision !== expected.revision)
+          )
+            throw new CollectionConflict();
+          const existing = await db.collections
+            .where("workspaceId")
+            .equals(workspaceId)
+            .toArray();
+          if (!current && existing.length >= collectionLimit)
+            throw new Error(
+              `This workspace supports up to ${collectionLimit} collections.`,
+            );
+          if (
+            existing.some(
+              (item) =>
+                item.id !== current?.id &&
+                collectionNameKey(item.name) === collectionNameKey(draft.name),
+            )
+          )
+            throw new Error(
+              "A collection with that name already exists in this workspace.",
+            );
+          await checkCollectionMembers(workspaceId, draft);
+          const now = Date.now();
+          const next: ReaderCollection = {
+            ...draft,
+            id: current?.id || crypto.randomUUID(),
+            workspaceId,
+            revision: current ? current.revision + 1 : 0,
+            createdAt: current?.createdAt ?? now,
+            updatedAt: now,
+          };
+          await db.collections.put(next);
+          return next;
+        },
+      ),
+    deleteCollection: (
+      workspaceId: string,
+      id: string,
+      expectedRevision: number,
+    ) =>
+      db.transaction("rw", db.collections, async () => {
+        const current = await db.collections.get(id);
+        if (
+          !current ||
+          current.workspaceId !== workspaceId ||
+          current.revision !== expectedRevision
+        )
+          throw new CollectionConflict();
+        await db.collections.delete(id);
+      }),
     directorySource: (workspaceId: string) =>
       db.directorySources.get(workspaceId),
     directorySources: () => db.directorySources.toArray(),
@@ -371,20 +534,26 @@ export function createStorage(name = "openmdviewer") {
       documents: ReaderDocument[],
       assets: ReaderAsset[],
       workspaceId = "default",
+      collections: CollectionDraft[] = [],
     ) =>
       withAssetStorage(assets, (assetRecords) =>
-        db.transaction("rw", db.documents, db.workspaceAssets, async () => {
-          const scopedDocs = documents.map((d) => ({
-            ...d,
-            workspaceId,
-            revision: 0,
-          }));
-          for (const doc of scopedDocs) await ensurePath(doc);
-          await db.documents.bulkAdd(scopedDocs);
-          await db.workspaceAssets.bulkAdd(
-            assetRecords.map((a) => ({ ...a, workspaceId })),
-          );
-        }),
+        db.transaction(
+          "rw",
+          [db.documents, db.workspaceAssets, db.workspaces, db.collections],
+          async () => {
+            const scopedDocs = documents.map((d) => ({
+              ...d,
+              workspaceId,
+              revision: 0,
+            }));
+            for (const doc of scopedDocs) await ensurePath(doc);
+            await db.documents.bulkAdd(scopedDocs);
+            await db.workspaceAssets.bulkAdd(
+              assetRecords.map((a) => ({ ...a, workspaceId })),
+            );
+            await addCollectionImports(workspaceId, collections);
+          },
+        ),
       ),
     // Compatibility helpers for initial document creation; content edits use save().
     put: async (doc: ReaderDocument) => {
@@ -434,13 +603,12 @@ export function createStorage(name = "openmdviewer") {
       workspace: LocalWorkspace,
       documents: ReaderDocument[],
       assets: ReaderAsset[],
+      collections: CollectionDraft[] = [],
     ) =>
       withAssetStorage(assets, (assetRecords) =>
         db.transaction(
           "rw",
-          db.workspaces,
-          db.documents,
-          db.workspaceAssets,
+          [db.workspaces, db.documents, db.workspaceAssets, db.collections],
           async () => {
             if (
               !workspace.id ||
@@ -481,6 +649,7 @@ export function createStorage(name = "openmdviewer") {
                   workspaceId: workspace.id,
                 })),
               );
+            await addCollectionImports(workspace.id, collections);
           },
         ),
       ),
