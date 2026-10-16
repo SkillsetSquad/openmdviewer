@@ -1,9 +1,15 @@
 // Build-time source factory. Only the generated browser service worker is shipped.
+export function offlineCachePrefix(base) {
+  return `openmdviewer-${encodeURIComponent(base || "root")}::`;
+}
+
 export function offlineWorkerSource({ base, urls, version }) {
-  const prefix = `openmdviewer-${base || "root"}-`;
+  const prefix = offlineCachePrefix(base);
+  const legacyPrefix = `openmdviewer-${base || "root"}-`;
   return `/* Generated from the static build. No documents or external responses are cached. */
 const CACHE=${JSON.stringify(prefix + version)};
 const PREFIX=${JSON.stringify(prefix)};
+const LEGACY_PREFIX=${JSON.stringify(legacyPrefix)};
 const URLS=${JSON.stringify(urls)};
 const ALLOWED=new Set(URLS.map(url=>new URL(url,self.location.origin).pathname));
 const CONCURRENCY=8;
@@ -85,7 +91,7 @@ async function prepareCache(){
  }finally{clearTimeout(timer);}
 }
 self.addEventListener('install',event=>event.waitUntil(prepareCache()));
-self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))),self.clients.claim()])));
+self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE&&(key.startsWith(PREFIX)||(key.startsWith(LEGACY_PREFIX)&&/^[a-f0-9]{16}$/.test(key.slice(LEGACY_PREFIX.length))))).map(key=>caches.delete(key)))),self.clients.claim()])));
 self.addEventListener('message',event=>{if(event.data==='ACTIVATE_UPDATE')self.skipWaiting();});
 self.addEventListener('fetch',event=>{
  const url=new URL(event.request.url);

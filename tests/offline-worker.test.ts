@@ -4,21 +4,29 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { offlineWorkerSource } from "../scripts/offline-worker.mjs";
+import {
+  offlineCachePrefix,
+  offlineWorkerSource,
+} from "../scripts/offline-worker.mjs";
 
 const origin = "https://reader.invalid";
 function harness({
+  base = "",
   urls = ["/app.js", "/"],
   fetcher = async () => new Response("asset"),
   putError = false,
 }: {
+  base?: string;
   urls?: string[];
   fetcher?: (url: string, init: RequestInit) => Promise<Response>;
   putError?: boolean;
 } = {}) {
   const listeners = new Map<string, (event: unknown) => void>();
   const stores = new Map<string, Map<string, Response>>([
-    ["openmdviewer-root-old", new Map([["/", new Response("old release")]])],
+    [
+      "openmdviewer-root-0123456789abcdef",
+      new Map([["/", new Response("old release")]]),
+    ],
     ["unrelated", new Map()],
   ]);
   const writes: string[] = [];
@@ -53,7 +61,7 @@ function harness({
     },
   };
   const fetch = vi.fn(fetcher);
-  const source = offlineWorkerSource({ base: "", urls, version: "candidate" });
+  const source = offlineWorkerSource({ base, urls, version: "candidate" });
   runInNewContext(source, {
     self: {
       location: { origin },
@@ -144,13 +152,13 @@ it("retries a transient HTTP 503, caches every asset, and only prunes old same-s
     worker.fetch.mock.calls.every(([, init]) => init.cache === "reload"),
   ).toBe(true);
   expect(
-    [...worker.stores.get("openmdviewer-root-candidate")!.keys()].sort(),
+    [...worker.stores.get("openmdviewer-root::candidate")!.keys()].sort(),
   ).toEqual(["/", "/app.js"]);
-  expect(worker.stores.has("openmdviewer-root-old")).toBe(true);
+  expect(worker.stores.has("openmdviewer-root-0123456789abcdef")).toBe(true);
   expect(worker.claims).toBe(0);
   expect(worker.skipped).toBe(0);
   await worker.activate();
-  expect(worker.stores.has("openmdviewer-root-old")).toBe(false);
+  expect(worker.stores.has("openmdviewer-root-0123456789abcdef")).toBe(false);
   expect(worker.stores.has("unrelated")).toBe(true);
   expect(worker.claims).toBe(1);
   worker.message("ACTIVATE_UPDATE");
@@ -186,9 +194,12 @@ it.each([401, 403, 404])(
     });
     await expect(worker.install()).rejects.toThrow(`HTTP ${status}`);
     expect(worker.fetch).toHaveBeenCalledTimes(1);
-    expect(worker.stores.has("openmdviewer-root-candidate")).toBe(false);
+    expect(worker.stores.has("openmdviewer-root::candidate")).toBe(false);
     expect(
-      await worker.stores.get("openmdviewer-root-old")!.get("/")!.text(),
+      await worker.stores
+        .get("openmdviewer-root-0123456789abcdef")!
+        .get("/")!
+        .text(),
     ).toBe("old release");
     expect(worker.claims).toBe(0);
     expect(worker.skipped).toBe(0);
@@ -204,8 +215,8 @@ it("limits transient failures to three attempts and leaves the active version in
   await vi.advanceTimersByTimeAsync(2000);
   await failed;
   expect(worker.fetch).toHaveBeenCalledTimes(3);
-  expect(worker.stores.has("openmdviewer-root-candidate")).toBe(false);
-  expect(worker.stores.has("openmdviewer-root-old")).toBe(true);
+  expect(worker.stores.has("openmdviewer-root::candidate")).toBe(false);
+  expect(worker.stores.has("openmdviewer-root-0123456789abcdef")).toBe(true);
 });
 it("retries request timeouts with cancellation and stops a stalled fetch body", async () => {
   vi.useFakeTimers();
@@ -229,7 +240,7 @@ it("retries request timeouts with cancellation and stops a stalled fetch body", 
   await failed;
   expect(worker.fetch).toHaveBeenCalledTimes(3);
   expect(aborted).toBe(3);
-  expect(worker.stores.has("openmdviewer-root-old")).toBe(true);
+  expect(worker.stores.has("openmdviewer-root-0123456789abcdef")).toBe(true);
 });
 it("stops all outstanding network work at the overall install budget", async () => {
   vi.useFakeTimers();
@@ -261,7 +272,7 @@ it("stops all outstanding network work at the overall install budget", async () 
   expect(worker.fetch.mock.calls.length).toBe(completed + aborted);
   expect(worker.fetch.mock.calls.length).toBeLessThan(urls.length);
   expect(worker.claims).toBe(0);
-  expect(worker.stores.has("openmdviewer-root-old")).toBe(true);
+  expect(worker.stores.has("openmdviewer-root-0123456789abcdef")).toBe(true);
 });
 
 it("never treats quota failures or off-origin redirects as retryable network errors", async () => {
@@ -270,7 +281,7 @@ it("never treats quota failures or off-origin redirects as retryable network err
     name: "QuotaExceededError",
   });
   expect(full.fetch).toHaveBeenCalledTimes(1);
-  expect(full.stores.has("openmdviewer-root-old")).toBe(true);
+  expect(full.stores.has("openmdviewer-root-0123456789abcdef")).toBe(true);
   const redirected = harness({
     urls: ["/app.js"],
     fetcher: async () => {
@@ -365,5 +376,36 @@ it("versions the actual generated cache from worker behavior even when exported 
     expect(await build(worker)).toEqual(original);
   } finally {
     await rm(stage, { recursive: true, force: true });
+  }
+});
+
+it("prunes only exact deployment caches, including legacy versions, while preserving neighboring paths", async () => {
+  const worker = harness({ base: "/reader", urls: ["/reader/"] });
+  const ownLegacy = "openmdviewer-/reader-0123456789abcdef";
+  const ownPrevious = offlineCachePrefix("/reader") + "older";
+  const retained = [
+    "openmdviewer-/reader-test-0123456789abcdef",
+    "openmdviewer-/reader/nested-0123456789abcdef",
+    offlineCachePrefix("/reader-test") + "older",
+    offlineCachePrefix("/reader/nested") + "older",
+    offlineCachePrefix("/reader::nested") + "older",
+    offlineCachePrefix("/root") + "older",
+    offlineCachePrefix("") + "older",
+    "openmdviewer-/reader-manual-cache",
+  ];
+  for (const key of [ownLegacy, ownPrevious, ...retained])
+    worker.stores.set(key, new Map([["/", new Response("preserve")]]));
+  await worker.install();
+  expect(worker.stores.has(ownLegacy)).toBe(true);
+  expect(worker.stores.has(ownPrevious)).toBe(true);
+  await worker.activate();
+  expect(worker.stores.has(ownLegacy)).toBe(false);
+  expect(worker.stores.has(ownPrevious)).toBe(false);
+  expect(worker.stores.has(offlineCachePrefix("/reader") + "candidate")).toBe(
+    true,
+  );
+  for (const key of retained) {
+    expect(worker.stores.has(key), key).toBe(true);
+    expect(await worker.stores.get(key)!.get("/")!.text()).toBe("preserve");
   }
 });

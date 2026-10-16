@@ -20,6 +20,8 @@ Select one engine with `--project=firefox` or `--project=webkit`. Tests run seri
 
 In GitHub Actions, dispatch `.github/workflows/compatibility.yml` on the desired commit/ref. Its independent browser jobs install system dependencies, build the static app and test both hosting paths. Failure traces are retained for seven days. Read each job's actual result; a successful workflow dispatch or completed build is not a passing browser test.
 
+The offline-cache recovery contracts use a dedicated loopback fault host and run separately at root and subpath in the Pages Chromium job and both compatibility jobs. They exercise real HTTP 503 recovery, permanent update failure with offline source preservation, and cache namespace migration through the explicit update UI. See [offline cache installation and verification](OFFLINE_CACHE.md).
+
 ## Interpretation and remaining scope
 
 Playwright Firefox and WebKit exercise those rendering engines. They do not certify every shipping Firefox/Safari version, Apple platform integration, actual Edge or iOS devices, all assistive technologies, or full WCAG 2.2 AA compliance. Native filesystem capabilities still depend on browser support; individual files, ZIP and downloads remain portable alternatives.

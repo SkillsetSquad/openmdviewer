@@ -1,7 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
+import { offlineCachePrefix } from "../../scripts/offline-worker.mjs";
 const base = process.env.TEST_BASE_PATH || "";
 const asset = `${base}/pdf-LICENSE.txt`;
-const prefix = `openmdviewer-${base || "root"}-`;
+const prefix = offlineCachePrefix(base);
 async function ready(page: Page) {
   await page.goto("./");
   await expect(
@@ -104,4 +105,65 @@ test("rejects a real permanent missing asset without replacing the active offlin
   expect((await keys(page)).filter((key) => key.startsWith(prefix))).toEqual(
     original,
   );
+});
+
+test("migrates only this deployment's legacy cache and preserves neighboring deployments", async ({
+  page,
+  request,
+}) => {
+  await request.post("http://127.0.0.1:3116/.__cache_test", { data: {} });
+  await ready(page);
+  await controlled(page);
+  // A legacy deployment already has an active worker when its update migrates caches.
+  const ownLegacy = `openmdviewer-${base || "root"}-0123456789abcdef`;
+  const neighborBase = base ? `${base}-test` : "/reader";
+  const retained = [
+    `openmdviewer-${neighborBase}-0123456789abcdef`,
+    offlineCachePrefix(neighborBase) + "0123456789abcdef",
+    "unrelated-application-cache",
+  ];
+  await page.evaluate(
+    async (names) => {
+      for (const name of names) {
+        const cache = await caches.open(name);
+        const url = `http://127.0.0.1:3116/migration-proof/${encodeURIComponent(name)}`;
+        await cache.put(url, new Response(`preserved:${name}`));
+        if ((await (await cache.match(url))?.text()) !== `preserved:${name}`)
+          throw new Error(`Migration fixture could not seed ${name}`);
+      }
+    },
+    [ownLegacy, ...retained],
+  );
+  await request.post("http://127.0.0.1:3116/.__cache_test", {
+    data: { update: "migration-update" },
+  });
+  await page.evaluate(async () => {
+    await (await navigator.serviceWorker.getRegistration())!.update();
+  });
+  const apply = page.getByRole("button", {
+    name: "Apply application update",
+    exact: true,
+  });
+  await expect(apply).toBeVisible({ timeout: 90000 });
+  await Promise.all([page.waitForEvent("load"), apply.click()]);
+  await expect(
+    page.getByRole("heading", { name: "Configuration Guide", exact: true }),
+  ).toBeVisible();
+  const names = await keys(page);
+  expect(names).not.toContain(ownLegacy);
+  expect(names.filter((name) => name.startsWith(prefix))).toHaveLength(1);
+  for (const name of retained) {
+    expect(names).toContain(name);
+    expect(
+      await page.evaluate(
+        async (name) =>
+          (await (
+            await caches.open(name)
+          ).match(
+            `http://127.0.0.1:3116/migration-proof/${encodeURIComponent(name)}`,
+          ))!.text(),
+        name,
+      ),
+    ).toBe(`preserved:${name}`);
+  }
 });

@@ -1,5 +1,6 @@
 // Test-only loopback static host with controlled cache-install faults. Never exported.
 import http from "node:http";
+import { offlineCachePrefix } from "./offline-worker.mjs";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 const root = path.resolve(process.env.STATIC_TEST_DIR || "out");
@@ -95,7 +96,7 @@ const server = http.createServer(async (req, res) => {
           .toString()
           .replace(
             /const CACHE="[^"]+";/,
-            `const CACHE=${JSON.stringify(`openmdviewer-${base || "root"}-${control.update}`)};`,
+            `const CACHE=${JSON.stringify(offlineCachePrefix(base) + control.update)};`,
           ),
       );
     }
