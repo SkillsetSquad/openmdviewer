@@ -3,7 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 
 async function replaceEditor(page: Page, content: string) {
   // Replace the selection immediately, rather than autosaving an empty clear.
-  // Native Enter events preserve line breaks in Firefox's input protocol too.
+  // Native character keys keep Firefox's CodeMirror input model synchronized.
   await page.bringToFront();
   const editor = page.locator(".cm-content");
   await editor.click();
@@ -13,7 +13,7 @@ async function replaceEditor(page: Page, content: string) {
   else
     for (const [index, line] of lines.entries()) {
       if (index) await editor.press("Enter");
-      if (line) await page.keyboard.insertText(line);
+      if (line) await editor.pressSequentially(line);
     }
   await expect(editor.locator(".cm-line")).toHaveText(lines);
 }
