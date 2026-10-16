@@ -29,6 +29,8 @@ jobs:
         run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Verify offline cache retries and safe failure at root
+        run: npx playwright test --config=playwright.offline-cache.config.ts --project=cache-chromium
       - uses: actions/configure-pages@v5
       - name: Build GitHub Pages subpath deployment
         run: npm run build
@@ -36,6 +38,8 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /openmdviewer
       - name: Verify deployed subpath in the browser
         run: npm run test:subpath
+      - name: Verify offline cache retries and safe failure at subpath
+        run: npm run test:subpath -- --config=playwright.offline-cache.config.ts --project=cache-chromium
       - name: Retain browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v4

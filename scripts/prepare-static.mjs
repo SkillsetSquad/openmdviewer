@@ -1,3 +1,4 @@
+import { offlineWorkerSource } from "./offline-worker.mjs";
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -53,32 +54,23 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
     ),
   );
 }
-const hash = createHash("sha256");
-for (const file of files.sort()) hash.update(await readFile(file));
-const version = hash.digest("hex").slice(0, 16);
-const urls = files.map(
-  (f) => `${base}/${path.relative("out", f).split(path.sep).join("/")}`,
-);
-urls.push(`${base}/`);
-const prefix = `openmdviewer-${base || "root"}-`;
-await writeFile(
-  "out/sw.js",
-  `/* Generated from the static build. No documents or external responses are cached. */
-const CACHE=${JSON.stringify(prefix + version)};
-const PREFIX=${JSON.stringify(prefix)};
-const URLS=${JSON.stringify(urls)};
-const ALLOWED=new Set(URLS);
-self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(URLS))));
-self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))),self.clients.claim()])));
-self.addEventListener('message',event=>{if(event.data==='ACTIVATE_UPDATE')self.skipWaiting();});
-self.addEventListener('fetch',event=>{
- const url=new URL(event.request.url);
- if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
- if(event.request.mode==='navigate'&&(url.pathname===${JSON.stringify(base + "/")}||url.pathname===${JSON.stringify(base + "/index.html")}))event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(${JSON.stringify(base + "/")}))||fetch(event.request)));
- else if(ALLOWED.has(url.pathname))event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(event.request))||fetch(event.request)));
+files.sort();
+const urls = files.map((file) => {
+  const relative = path.relative("out", file).split(path.sep).join("/");
+  const url = new URL("https://static.invalid");
+  // pathname encoding preserves valid path punctuation while escaping fragments,
+  // query delimiters and literal percent signs from source filenames.
+  url.pathname = `${base}/${relative.replaceAll("%", "%25")}`;
+  return url.pathname;
 });
-`,
-);
+urls.push(`${base}/`);
+const hash = createHash("sha256");
+// Include worker behavior and URL scope, not just asset bytes, in cache identity.
+hash.update(offlineWorkerSource({ base, urls, version: "__BUILD_REVISION__" }));
+for (const file of files) hash.update(await readFile(file));
+const version = hash.digest("hex").slice(0, 16);
+await writeFile("out/sw.js", offlineWorkerSource({ base, urls, version }));
+
 console.log(
   `Prepared static app: ${files.length} cached assets, revision ${version}, base path ${base || "/"}`,
 );

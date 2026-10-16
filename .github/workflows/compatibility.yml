@@ -26,12 +26,16 @@ jobs:
         run: npm run build
       - name: Verify root reader contracts
         run: npm run test:compat -- --project=${{ matrix.browser }}
+      - name: Verify root offline-cache recovery
+        run: npx playwright test --config=playwright.offline-cache.config.ts --project=cache-${{ matrix.browser }}
       - name: Build subpath static application
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /openmdviewer
       - name: Verify subpath reader contracts
         run: npm run test:subpath -- --config=playwright.compat.config.ts --project=${{ matrix.browser }}
+      - name: Verify subpath offline-cache recovery
+        run: npm run test:subpath -- --config=playwright.offline-cache.config.ts --project=cache-${{ matrix.browser }}
       - name: Retain browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v4

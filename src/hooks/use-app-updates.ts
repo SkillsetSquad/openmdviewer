@@ -19,6 +19,10 @@ export function useAppUpdates(
     let registration: ServiceWorkerRegistration | undefined;
     let installing: ServiceWorker | null = null;
     const stateChanged = () => {
+      if (!closed && installing?.state === "redundant")
+        notify(
+          "Offline caching could not be completed. Reload online to retry. Your local documents can still be exported.",
+        );
       if (
         !closed &&
         installing?.state === "installed" &&
@@ -27,8 +31,10 @@ export function useAppUpdates(
         setWaiting(registration?.waiting || installing);
     };
     const found = () => {
+      installing?.removeEventListener("statechange", stateChanged);
       installing = registration?.installing || null;
       installing?.addEventListener("statechange", stateChanged);
+      stateChanged();
     };
     const controllerChanged = async () => {
       if (!controlled) {

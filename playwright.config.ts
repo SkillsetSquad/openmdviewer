@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
+  // Dedicated tests need their controlled static fault host, not the ordinary preview.
+  testIgnore: "offline-cache.spec.ts",
   fullyParallel: false,
   // Update and PDF-cancellation tests temporarily change shared static assets.
   workers: 1,
