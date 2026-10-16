@@ -2,15 +2,20 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 async function replaceEditor(page: Page, content: string) {
-  // Paste the fixture in one native input event. Clearing first can trigger
-  // the real 450 ms autosave/conflict dialog before typing on a slow runner.
+  // Replace the selection immediately, rather than autosaving an empty clear.
+  // Native Enter events preserve line breaks in Firefox's input protocol too.
   await page.bringToFront();
   const editor = page.locator(".cm-content");
   await editor.click();
   await editor.press("ControlOrMeta+a");
-  if (content) await page.keyboard.insertText(content);
-  else await editor.press("Backspace");
-  await expect(editor.locator(".cm-line")).toHaveText(content.split("\n"));
+  const lines = content.split("\n");
+  if (!content) await editor.press("Backspace");
+  else
+    for (const [index, line] of lines.entries()) {
+      if (index) await editor.press("Enter");
+      if (line) await page.keyboard.insertText(line);
+    }
+  await expect(editor.locator(".cm-line")).toHaveText(lines);
 }
 
 test("reference layout renders locally, navigates, and changes themes", async ({
