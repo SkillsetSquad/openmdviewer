@@ -2,16 +2,15 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 async function replaceEditor(page: Page, content: string) {
+  // Paste the fixture in one native input event. Clearing first can trigger
+  // the real 450 ms autosave/conflict dialog before typing on a slow runner.
+  await page.bringToFront();
   const editor = page.locator(".cm-content");
   await editor.click();
   await editor.press("ControlOrMeta+a");
-  await editor.press("Backspace");
-  const lines = content.split("\n");
-  for (const [index, line] of lines.entries()) {
-    if (index) await editor.press("Enter");
-    if (line) await editor.pressSequentially(line);
-  }
-  await expect(editor.locator(".cm-line")).toHaveText(lines);
+  if (content) await page.keyboard.insertText(content);
+  else await editor.press("Backspace");
+  await expect(editor.locator(".cm-line")).toHaveText(content.split("\n"));
 }
 
 test("reference layout renders locally, navigates, and changes themes", async ({
