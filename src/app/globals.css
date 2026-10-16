@@ -189,6 +189,8 @@ summary:focus-visible {
   --ring: #65adff;
   --radius: 0.5rem;
   display: flex;
+  /* Contain absolutely positioned accessibility labels within the app shell. */
+  position: relative;
   height: 100dvh;
   overflow: hidden;
   background: var(--app-bg);

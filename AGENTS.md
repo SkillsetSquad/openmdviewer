@@ -33,6 +33,7 @@
 
 ## Quality
 
+- Keep absolute-positioned descendants contained by the fixed-height workspace. Document/sidebar scrolling must not create a second root scrollbar or blank space below the reader; verify desktop and mobile dimensions.
 - Match the reference: dark three-pane reader, blue accents, file tree, document toolbar, typography, contents/properties panel. Support small screens, keyboard navigation, reduced motion, and print.
 - Every visible control must work. No fabricated statistics or placeholder features.
 - Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` for relevant changes; exercise core flows with Playwright.
