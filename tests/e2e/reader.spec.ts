@@ -2,15 +2,19 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 async function replaceEditor(page: Page, content: string) {
+  // Replace the selection immediately, rather than autosaving an empty clear.
+  // Native character keys keep Firefox's CodeMirror input model synchronized.
+  await page.bringToFront();
   const editor = page.locator(".cm-content");
   await editor.click();
   await editor.press("ControlOrMeta+a");
-  await editor.press("Backspace");
   const lines = content.split("\n");
-  for (const [index, line] of lines.entries()) {
-    if (index) await editor.press("Enter");
-    if (line) await editor.pressSequentially(line);
-  }
+  if (!content) await editor.press("Backspace");
+  else
+    for (const [index, line] of lines.entries()) {
+      if (index) await editor.press("Enter");
+      if (line) await editor.pressSequentially(line);
+    }
   await expect(editor.locator(".cm-line")).toHaveText(lines);
 }
 
