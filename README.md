@@ -63,7 +63,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Tests cover path safety, heading anchors, link analysis, untrusted input, imports/exports, editing persistence, themes, navigation, math, diagrams, mobile overflow, serious/critical axe findings, and offline startup with lazy modules. CI runs these checks before publishing the static Pages artifact.
+Tests cover path safety, heading anchors, link analysis, untrusted input, imports/exports, editing persistence, themes, navigation, math, diagrams, mobile overflow, serious/critical axe findings, and offline startup with lazy modules. CI runs these checks before publishing the static Pages artifact. See [metadata caching and measured performance limits](docs/PERFORMANCE.md) for the bounded model cache and remaining large-document work.
 
 See [AGENTS.md](AGENTS.md) before making changes. Commit every completed logical change. [MIT licensed](LICENSE); [asset credits](docs/ASSETS.md).
 

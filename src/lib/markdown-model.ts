@@ -69,6 +69,8 @@ export interface MarkdownModel {
     tables: number;
   };
 }
+const modelCacheCharacters = 4 * 1024 * 1024;
+const modelCacheEntries = 24;
 const cache = new Map<string, MarkdownModel>();
 let cachedSize = 0;
 const parser = unified()
@@ -208,10 +210,14 @@ export function markdownModel(content: string): MarkdownModel {
       tables,
     },
   };
-  if (content.length <= 1048576) {
+  // Entries that fit the total budget can be reused, including manuals above 1 MiB.
+  if (content.length <= modelCacheCharacters) {
     cache.set(content, model);
     cachedSize += content.length;
-    while (cache.size > 24 || cachedSize > 4194304) {
+    while (
+      cache.size > modelCacheEntries ||
+      cachedSize > modelCacheCharacters
+    ) {
       const oldest = cache.keys().next().value!;
       cachedSize -= oldest.length;
       cache.delete(oldest);
