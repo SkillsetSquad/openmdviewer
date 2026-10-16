@@ -1,3 +1,8 @@
+import {
+  collectionArchive,
+  collectionsFromArchive,
+  type ReaderCollection,
+} from "./collections";
 import type { LocalWorkspace, ReaderDocument } from "./types";
 import { parseRepositoryOrigin } from "./repositories/types";
 import { parseAnnotations } from "./annotations";
@@ -5,6 +10,7 @@ export const workspaceMetadataPath = ".openmdviewer/workspace.json";
 export function workspaceMetadata(
   documents: ReaderDocument[],
   workspace?: LocalWorkspace,
+  collections: ReaderCollection[] = [],
 ) {
   return JSON.stringify(
     {
@@ -18,6 +24,18 @@ export function workspaceMetadata(
             icon: workspace.icon,
           }
         : undefined,
+      ...(collections.length
+        ? {
+            collections: collectionArchive(
+              collections.filter(
+                (c) =>
+                  c.workspaceId ===
+                  (workspace?.id || documents[0]?.workspaceId || "default"),
+              ),
+              documents,
+            ),
+          }
+        : {}),
       documents: documents.map((d) => ({
         path: d.path,
         tags: d.tags,
@@ -43,6 +61,7 @@ export function applyWorkspaceMetadata(
     format?: unknown;
     version?: unknown;
     documents?: unknown;
+    collections?: unknown;
   };
   if (
     data.format !== "openmdviewer" ||
@@ -51,6 +70,7 @@ export function applyWorkspaceMetadata(
     data.documents.length > 10000
   )
     throw new Error("Unsupported workspace metadata format.");
+  const collections = collectionsFromArchive(data.collections, documents);
   const map = new Map(documents.map((d) => [d.path, d]));
   for (const record of data.documents) {
     if (
@@ -85,4 +105,5 @@ export function applyWorkspaceMetadata(
       )
         doc[field] = record[field];
   }
+  return collections;
 }

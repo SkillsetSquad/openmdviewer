@@ -19,6 +19,7 @@ export interface ConversionResult {
   documents: ReaderDocument[];
   assets: ReaderAsset[];
   reports: ConversionReport[];
+  collections?: import("./collections").CollectionDraft[];
 }
 export const convertibleFile = (path: string) =>
   /\.(html?|docx|pdf)$/i.test(path);

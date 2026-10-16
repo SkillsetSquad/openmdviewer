@@ -645,11 +645,15 @@ export default function Workspace() {
     [openDocument, notify, assetURLs],
   );
   async function persistImport(
-    imported: Pick<ConversionResult, "documents" | "assets">,
+    imported: Pick<ConversionResult, "documents" | "assets" | "collections">,
     targetWorkspaceId: string,
   ) {
     const additions = imported.documents;
-    if (!additions.length && !imported.assets.length) {
+    if (
+      !additions.length &&
+      !imported.assets.length &&
+      !imported.collections?.length
+    ) {
       notify(
         "Choose Markdown, text, media, HTML, DOCX, or a ZIP containing supported files.",
       );
@@ -670,7 +674,12 @@ export default function Workspace() {
       added.workspaceId = targetWorkspaceId;
       added.revision = 0;
     }
-    await storage.import(additions, imported.assets, targetWorkspaceId);
+    await storage.import(
+      additions,
+      imported.assets,
+      targetWorkspaceId,
+      imported.collections,
+    );
     await refreshAssets(targetWorkspaceId);
     if (useReader.getState().workspaceId !== targetWorkspaceId) {
       notify(
@@ -727,6 +736,7 @@ export default function Workspace() {
       workspaceMetadata(
         documents,
         workspaces.find((w) => w.id === workspaceId),
+        await storage.collections(workspaceId),
       ),
     );
     download(

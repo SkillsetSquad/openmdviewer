@@ -1,3 +1,4 @@
+import type { CollectionDraft } from "./collections";
 import {
   workspaceMetadataPath,
   applyWorkspaceMetadata,
@@ -53,6 +54,7 @@ export function isolateImport(
 export async function readLocalFiles(files: File[], paths?: string[]) {
   const documents: ReaderDocument[] = [];
   const assets: ReaderAsset[] = [];
+  const collections: CollectionDraft[] = [];
   let total = 0;
   const add = (path: string, bytes: Uint8Array) => {
     if (bytes.length > 30 * 1024 * 1024)
@@ -97,9 +99,11 @@ export async function readLocalFiles(files: File[], paths?: string[]) {
       const first = documents.length;
       for (const [path, bytes] of Object.entries(content)) add(path, bytes);
       if (content[workspaceMetadataPath])
-        applyWorkspaceMetadata(
-          documents.slice(first),
-          new TextDecoder().decode(content[workspaceMetadataPath]),
+        collections.push(
+          ...applyWorkspaceMetadata(
+            documents.slice(first),
+            new TextDecoder().decode(content[workspaceMetadataPath]),
+          ),
         );
     } else if (supportedFile(file.name) || attachmentType(file.name))
       add(
@@ -113,5 +117,5 @@ export async function readLocalFiles(files: File[], paths?: string[]) {
       throw new Error(`Import contains conflicting paths: ${item.path}`);
     seen.add(item.path);
   }
-  return { documents, assets };
+  return { documents, assets, collections };
 }
